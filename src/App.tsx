@@ -26,7 +26,7 @@ function decode(bin: Uint8Array) {
 const KDF = 'PBKDF2';
 const CIPHER = 'AES-GCM';
 const CIPHER_LENGTH = 256;
-const ITERATIONS = 6000000;
+const ITERATIONS = 1000000;
 const HASH = 'SHA-256';
 
 function App() {
