@@ -137,7 +137,6 @@ function App() {
         }}
       />
       <textarea
-        spellCheck={false}
         placeholder="plain text"
         value={plainText}
         onChange={(e) => {
