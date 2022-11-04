@@ -137,6 +137,7 @@ function App() {
         }}
       />
       <textarea
+        spellCheck={false}
         placeholder="plain text"
         value={plainText}
         onChange={(e) => {
@@ -148,6 +149,7 @@ function App() {
         <button onClick={decrypt}>Decrypt</button>
       </div>
       <textarea
+        spellCheck={false}
         placeholder="cipher text"
         value={cipherText}
         onChange={(e) => {
