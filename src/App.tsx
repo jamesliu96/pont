@@ -123,6 +123,7 @@ function App() {
   return (
     <div className="App">
       <input
+        disabled={wait}
         placeholder="passcode"
         type={focus ? 'text' : 'password'}
         value={passcode}
@@ -137,6 +138,7 @@ function App() {
         }}
       />
       <textarea
+        disabled={wait}
         placeholder="plain text"
         value={plainText}
         onChange={(e) => {
@@ -144,10 +146,11 @@ function App() {
         }}
       />
       <div>
-        <button onClick={encrypt}>Encrypt</button>
-        <button onClick={decrypt}>Decrypt</button>
+        <button disabled={wait} onClick={encrypt}>Encrypt</button>
+        <button disabled={wait} onClick={decrypt}>Decrypt</button>
       </div>
       <textarea
+        disabled={wait}
         spellCheck={false}
         placeholder="cipher text"
         value={cipherText}
@@ -155,7 +158,6 @@ function App() {
           setCipherText(e.target.value);
         }}
       />
-      {wait ? <div className="wait">wait...</div> : null}
     </div>
   );
 }
