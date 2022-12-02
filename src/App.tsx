@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 import './App.css';
 
@@ -121,7 +121,7 @@ function App() {
   }, [passcode, cipherText]);
 
   useEffect(() => {
-    const handleMessage = ({ data }: MessageEvent) => {
+    const handleMessage = ({ data }: MessageEvent<{ shared?: string }>) => {
       if (typeof data?.shared === 'string') {
         setPasscode(data.shared);
       }
@@ -130,14 +130,11 @@ function App() {
     return () => {
       window.removeEventListener('message', handleMessage);
     }
-  }, [])
-
-  const plainRef = useRef<HTMLTextAreaElement>(null);
-  const cipherRef = useRef<HTMLTextAreaElement>(null);
+  }, []);
 
   return (
     <div className="App">
-      <iframe title='xp' src={`//${process.env.NODE_ENV === 'development' ? 'localhost:3000' : 'geheim.jamesliu.info'}/xp/`} allow="clipboard-write" />
+      <iframe title="xp" src="//geheim.jamesliu.info/xp/" />
       <input
         disabled={wait}
         placeholder="passcode"
@@ -154,16 +151,11 @@ function App() {
         }}
       />
       <textarea
-        ref={plainRef}
         disabled={wait}
         placeholder="plain text"
         value={plainText}
         onChange={(e) => {
           setPlainText(e.target.value);
-        }}
-        onClick={() => {
-          plainRef.current?.select();
-          navigator.clipboard.writeText(plainText);
         }}
       />
       <div>
@@ -171,17 +163,12 @@ function App() {
         <button disabled={wait} onClick={decrypt}>Decrypt</button>
       </div>
       <textarea
-        ref={cipherRef}
         disabled={wait}
         spellCheck={false}
         placeholder="cipher text"
         value={cipherText}
         onChange={(e) => {
           setCipherText(e.target.value);
-        }}
-        onClick={() => {
-          cipherRef.current?.select();
-          navigator.clipboard.writeText(cipherText);
         }}
       />
     </div>
