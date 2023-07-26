@@ -1,0 +1,30 @@
+.App {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+
+iframe {
+  border: 0;
+  width: 600px;
+  height: 30px;
+}
+
+input,
+textarea,
+section {
+  margin-top: 4px;
+}
+
+button + button {
+  margin-left: 4px;
+}
+
+button,
+input,
+textarea {
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
+    monospace;
+}
