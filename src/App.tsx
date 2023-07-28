@@ -12,6 +12,14 @@ const encode = (str: string) =>
   Uint8Array.from([...str].map((c) => c.charCodeAt(0)));
 const decode = (bin: Uint8Array) => String.fromCharCode(...bin);
 
+const hex_to_ascii = (hex: string) => {
+  if (!hex.length || hex.length % 2) return '';
+  let ascii = '';
+  for (let idx = 0; idx < hex.length; idx += 2)
+    ascii += String.fromCharCode(parseInt(hex.slice(idx, idx + 2), 16));
+  return ascii;
+};
+
 const KDF = 'PBKDF2';
 const CIPHER = 'AES-GCM';
 const CIPHER_LENGTH = 256;
@@ -111,7 +119,7 @@ const App = () => {
 
   useEffect(() => {
     const handleMessage = ({ data }: MessageEvent<{ shared: string }>) => {
-      if (data.shared) setPasscode(data.shared);
+      if (data.shared) setPasscode(hex_to_ascii(data.shared));
     };
     window.addEventListener('message', handleMessage);
     return () => {
@@ -121,49 +129,51 @@ const App = () => {
 
   return (
     <div className="App">
-      <iframe title="xp" src="//geheim.jamesliu.info/xp/" />
-      <input
-        disabled={wait}
-        placeholder="passcode"
-        type={focus ? 'text' : 'password'}
-        value={passcode}
-        onChange={(e) => {
-          setPasscode(e.target.value);
-        }}
-        onFocus={() => {
-          setFocus(true);
-        }}
-        onBlur={() => {
-          setFocus(false);
-        }}
-      />
-      <textarea
-        rows={5}
-        disabled={wait}
-        placeholder="plain text"
-        value={plainText}
-        onChange={(e) => {
-          setPlainText(e.target.value);
-        }}
-      />
-      <section>
-        <button disabled={wait} onClick={encrypt}>
-          Encrypt
-        </button>
-        <button disabled={wait} onClick={decrypt}>
-          Decrypt
-        </button>
-      </section>
-      <textarea
-        rows={10}
-        disabled={wait}
-        spellCheck={false}
-        placeholder="cipher text"
-        value={cipherText}
-        onChange={(e) => {
-          setCipherText(e.target.value);
-        }}
-      />
+      <main>
+        <iframe title="xp" src="//geheim.jamesliu.info/xp/" />
+        <input
+          disabled={wait}
+          placeholder="passcode"
+          type={focus ? 'text' : 'password'}
+          value={passcode}
+          onChange={(e) => {
+            setPasscode(e.target.value);
+          }}
+          onFocus={() => {
+            setFocus(true);
+          }}
+          onBlur={() => {
+            setFocus(false);
+          }}
+        />
+        <textarea
+          rows={5}
+          disabled={wait}
+          placeholder="plain text"
+          value={plainText}
+          onChange={(e) => {
+            setPlainText(e.target.value);
+          }}
+        />
+        <section>
+          <button disabled={wait} onClick={encrypt}>
+            Encrypt
+          </button>
+          <button disabled={wait} onClick={decrypt}>
+            Decrypt
+          </button>
+        </section>
+        <textarea
+          rows={10}
+          disabled={wait}
+          spellCheck={false}
+          placeholder="cipher text"
+          value={cipherText}
+          onChange={(e) => {
+            setCipherText(e.target.value);
+          }}
+        />
+      </main>
     </div>
   );
 };
