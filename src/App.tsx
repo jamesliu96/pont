@@ -130,31 +130,37 @@ const App = () => {
   return (
     <div className="App">
       <main>
-        <iframe title="xp" src="//geheim.jamesliu.info/xp/" />
-        <input
-          disabled={wait}
-          placeholder="passcode"
-          type={focus ? 'text' : 'password'}
-          value={passcode}
-          onChange={(e) => {
-            setPasscode(e.target.value);
-          }}
-          onFocus={() => {
-            setFocus(true);
-          }}
-          onBlur={() => {
-            setFocus(false);
-          }}
-        />
-        <textarea
-          rows={5}
-          disabled={wait}
-          placeholder="plain text"
-          value={plainText}
-          onChange={(e) => {
-            setPlainText(e.target.value);
-          }}
-        />
+        <section>
+          <iframe title="xp" src="//geheim.jamesliu.info/xp/" />
+        </section>
+        <section>
+          <input
+            disabled={wait}
+            placeholder="passcode"
+            type={focus ? 'text' : 'password'}
+            value={passcode}
+            onChange={(e) => {
+              setPasscode(e.target.value);
+            }}
+            onFocus={() => {
+              setFocus(true);
+            }}
+            onBlur={() => {
+              setFocus(false);
+            }}
+          />
+        </section>
+        <section>
+          <textarea
+            rows={5}
+            disabled={wait}
+            placeholder="plain text"
+            value={plainText}
+            onChange={(e) => {
+              setPlainText(e.target.value);
+            }}
+          />
+        </section>
         <section>
           <button disabled={wait} onClick={encrypt}>
             Encrypt
@@ -163,16 +169,18 @@ const App = () => {
             Decrypt
           </button>
         </section>
-        <textarea
-          rows={10}
-          disabled={wait}
-          spellCheck={false}
-          placeholder="cipher text"
-          value={cipherText}
-          onChange={(e) => {
-            setCipherText(e.target.value);
-          }}
-        />
+        <section>
+          <textarea
+            rows={10}
+            disabled={wait}
+            spellCheck={false}
+            placeholder="cipher text"
+            value={cipherText}
+            onChange={(e) => {
+              setCipherText(e.target.value);
+            }}
+          />
+        </section>
       </main>
     </div>
   );
