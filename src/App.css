@@ -1,8 +1,10 @@
 .App {
   min-height: 100vh;
   display: flex;
+  flex-direction: column;
   justify-content: center;
   align-items: center;
+  user-select: none;
 }
 
 main {
@@ -37,4 +39,13 @@ input,
 textarea {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
     monospace;
+}
+
+footer {
+  margin-top: 2em;
+  text-align: center;
+  color: gray;
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
+    monospace;
+  font-size: x-small;
 }

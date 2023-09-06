@@ -20,6 +20,14 @@ const hex_to_ascii = (hex: string) => {
   return ascii;
 };
 
+const parseCipherText = (cipherText: string) => {
+  const [_salt, _iv = '', _cipher = ''] = cipherText.split('|');
+  const salt = encode(b64_to_utf8(_salt));
+  const iv = encode(b64_to_utf8(_iv));
+  const cipher = encode(b64_to_utf8(_cipher));
+  return { salt, iv, cipher };
+};
+
 const KDF = 'PBKDF2';
 const CIPHER = 'AES-GCM';
 const CIPHER_LENGTH = 256;
@@ -31,6 +39,7 @@ const App = () => {
   const [focus, setFocus] = useState(false);
 
   const [passcode, setPasscode] = useState('');
+
   const [plainText, setPlainText] = useState('');
   const [cipherText, setCipherText] = useState('');
 
@@ -63,16 +72,16 @@ const App = () => {
         key,
         plain
       );
-      setCipherText(
-        [
-          utf8_to_b64(decode(salt)),
-          utf8_to_b64(decode(iv)),
-          utf8_to_b64(decode(new Uint8Array(cipher))),
-        ].join('|')
-      );
+      const text = [
+        utf8_to_b64(decode(salt)),
+        utf8_to_b64(decode(iv)),
+        utf8_to_b64(decode(new Uint8Array(cipher))),
+      ].join('|');
+      setCipherText(text);
+      await navigator.clipboard.writeText(text);
     } catch (e) {
-      alert(e);
       console.error(e);
+      alert(e);
     } finally {
       setWait(false);
     }
@@ -81,10 +90,7 @@ const App = () => {
   const decrypt = useCallback(async () => {
     setWait(true);
     try {
-      const [_salt, _iv = '', _cipher = ''] = cipherText.split('|');
-      const salt = encode(b64_to_utf8(_salt));
-      const iv = encode(b64_to_utf8(_iv));
-      const cipher = encode(b64_to_utf8(_cipher));
+      const { salt, iv, cipher } = parseCipherText(cipherText);
       const key = await crypto.subtle.deriveKey(
         {
           name: KDF,
@@ -110,16 +116,26 @@ const App = () => {
       );
       setPlainText(decodeText(plain));
     } catch (e) {
-      alert(e);
       console.error(e);
+      alert(e);
     } finally {
       setWait(false);
     }
   }, [passcode, cipherText]);
 
+  const handleFocus = useCallback(async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      const { salt, iv, cipher } = parseCipherText(text);
+      if (salt.length && iv.length && cipher.length) setCipherText(text);
+    } catch {}
+  }, []);
+
   useEffect(() => {
-    const handleMessage = ({ data }: MessageEvent<{ shared: string }>) => {
-      if (data.shared) setPasscode(hex_to_ascii(data.shared));
+    const handleMessage = ({
+      data,
+    }: MessageEvent<{ shared?: string } | undefined>) => {
+      if (data?.shared) setPasscode(hex_to_ascii(data.shared));
     };
     window.addEventListener('message', handleMessage);
     return () => {
@@ -131,7 +147,11 @@ const App = () => {
     <div className="App">
       <main>
         <section>
-          <iframe title="xp" src="//geheim.jamesliu.info/xp/" />
+          <iframe
+            title="xp"
+            src="//geheim.jamesliu.info/xp/"
+            allow="clipboard-read *; clipboard-write *"
+          />
         </section>
         <section>
           <input
@@ -179,9 +199,42 @@ const App = () => {
             onChange={(e) => {
               setCipherText(e.target.value);
             }}
+            onFocus={handleFocus}
           />
         </section>
       </main>
+      <footer>
+        <div>powered by</div>
+        <div>
+          The{' '}
+          <a
+            href="https://www.w3.org/TR/WebCryptoAPI/"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Web Crypto API
+          </a>
+        </div>
+        <div>and</div>
+        <div>
+          <a
+            href="https://geheim.jamesliu.info"
+            target="_blank"
+            rel="noreferrer"
+          >
+            geheim
+          </a>
+          <div>hopefully then</div>
+          <a
+            href="https://wicg.github.io/webcrypto-secure-curves/"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Web Crypto API § Secure Curves
+          </a>
+          <div>instead</div>
+        </div>
+      </footer>
     </div>
   );
 };
