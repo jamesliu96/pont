@@ -7,8 +7,12 @@
   user-select: none;
 }
 
-main {
+main,
+iframe {
   width: 200px;
+}
+
+main {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -17,8 +21,7 @@ main {
 
 iframe {
   border: 0;
-  width: 200px;
-  height: 150px;
+  height: 160px;
 }
 
 input,
@@ -36,7 +39,8 @@ section {
 
 button,
 input,
-textarea {
+textarea,
+footer {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
     monospace;
 }
@@ -45,7 +49,5 @@ footer {
   margin-top: 2em;
   text-align: center;
   color: gray;
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
-    monospace;
   font-size: x-small;
 }
