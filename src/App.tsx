@@ -28,6 +28,17 @@ const parseCipherText = (cipherText: string) => {
   return { salt, iv, cipher };
 };
 
+const copy = async (text: string) => {
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch {}
+};
+const paste = async () => {
+  try {
+    return await navigator.clipboard.readText();
+  } catch {}
+};
+
 const KDF = 'PBKDF2';
 const CIPHER = 'AES-GCM';
 const CIPHER_LENGTH = 256;
@@ -78,7 +89,7 @@ const App = () => {
         utf8_to_b64(decode(new Uint8Array(cipher))),
       ].join('|');
       setCipherText(text);
-      await navigator.clipboard.writeText(text);
+      await copy(text);
     } catch (e) {
       console.error(e);
       alert(e);
@@ -125,9 +136,11 @@ const App = () => {
 
   const handleFocus = useCallback(async () => {
     try {
-      const text = await navigator.clipboard.readText();
-      const { salt, iv, cipher } = parseCipherText(text);
-      if (salt.length && iv.length && cipher.length) setCipherText(text);
+      const text = await paste();
+      if (text) {
+        const { salt, iv, cipher } = parseCipherText(text);
+        if (salt.length && iv.length && cipher.length) setCipherText(text);
+      }
     } catch {}
   }, []);
 
