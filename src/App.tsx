@@ -147,8 +147,11 @@ const App = () => {
   useEffect(() => {
     const handleMessage = ({
       data,
-    }: MessageEvent<{ shared?: string } | undefined>) => {
-      if (data?.shared) setPasscode(hex_to_ascii(data.shared));
+    }: MessageEvent<
+      { hex?: string; bin?: string } | undefined
+    >) => {
+      if (data?.bin) setPasscode(data.bin);
+      else if (data?.hex) setPasscode(hex_to_ascii(data.hex));
     };
     window.addEventListener('message', handleMessage);
     return () => {
