@@ -57,36 +57,39 @@ const App = () => {
   const encrypt = useCallback(async () => {
     setWait(true);
     try {
-      const plain = encodeText(plainText);
       const salt = crypto.getRandomValues(new Uint8Array(32));
       const iv = crypto.getRandomValues(new Uint8Array(16));
-      const key = await crypto.subtle.deriveKey(
-        {
-          name: KDF,
-          salt,
-          iterations: ITERATIONS,
-          hash: HASH,
-        },
-        await crypto.subtle.importKey(
-          'raw',
-          encodeText(passcode),
-          { name: KDF },
-          false,
-          ['deriveKey']
-        ),
-        { name: CIPHER, length: CIPHER_LENGTH },
-        true,
-        ['encrypt']
-      );
-      const cipher = await crypto.subtle.encrypt(
-        { name: CIPHER, iv },
-        key,
-        plain
-      );
       const text = [
         utf8_to_b64(decode(salt)),
         utf8_to_b64(decode(iv)),
-        utf8_to_b64(decode(new Uint8Array(cipher))),
+        utf8_to_b64(
+          decode(
+            new Uint8Array(
+              await crypto.subtle.encrypt(
+                { name: CIPHER, iv },
+                await crypto.subtle.deriveKey(
+                  {
+                    name: KDF,
+                    salt,
+                    iterations: ITERATIONS,
+                    hash: HASH,
+                  },
+                  await crypto.subtle.importKey(
+                    'raw',
+                    encodeText(passcode),
+                    { name: KDF },
+                    false,
+                    ['deriveKey']
+                  ),
+                  { name: CIPHER, length: CIPHER_LENGTH },
+                  true,
+                  ['encrypt']
+                ),
+                encodeText(plainText)
+              )
+            )
+          )
+        ),
       ].join('|');
       setCipherText(text);
       await copy(text);
@@ -102,30 +105,32 @@ const App = () => {
     setWait(true);
     try {
       const { salt, iv, cipher } = parseCipherText(cipherText);
-      const key = await crypto.subtle.deriveKey(
-        {
-          name: KDF,
-          salt,
-          iterations: ITERATIONS,
-          hash: HASH,
-        },
-        await crypto.subtle.importKey(
-          'raw',
-          encodeText(passcode),
-          { name: KDF },
-          false,
-          ['deriveKey']
-        ),
-        { name: CIPHER, length: CIPHER_LENGTH },
-        true,
-        ['decrypt']
+      setPlainText(
+        decodeText(
+          await crypto.subtle.decrypt(
+            { name: CIPHER, iv },
+            await crypto.subtle.deriveKey(
+              {
+                name: KDF,
+                salt,
+                iterations: ITERATIONS,
+                hash: HASH,
+              },
+              await crypto.subtle.importKey(
+                'raw',
+                encodeText(passcode),
+                { name: KDF },
+                false,
+                ['deriveKey']
+              ),
+              { name: CIPHER, length: CIPHER_LENGTH },
+              true,
+              ['decrypt']
+            ),
+            cipher
+          )
+        )
       );
-      const plain = await crypto.subtle.decrypt(
-        { name: CIPHER, iv },
-        key,
-        cipher
-      );
-      setPlainText(decodeText(plain));
     } catch (e) {
       console.error(e);
       alert(e);
@@ -147,9 +152,7 @@ const App = () => {
   useEffect(() => {
     const handleMessage = ({
       data,
-    }: MessageEvent<
-      { hex?: string; bin?: string } | undefined
-    >) => {
+    }: MessageEvent<{ hex?: string; bin?: string } | undefined>) => {
       if (data?.bin) setPasscode(data.bin);
       else if (data?.hex) setPasscode(hex_to_ascii(data.hex));
     };
@@ -240,15 +243,6 @@ const App = () => {
           >
             geheim
           </a>
-          <div>hopefully then</div>
-          <a
-            href="https://wicg.github.io/webcrypto-secure-curves/"
-            target="_blank"
-            rel="noreferrer"
-          >
-            Web Crypto API § Secure Curves
-          </a>
-          <div>instead</div>
         </div>
       </footer>
     </div>
