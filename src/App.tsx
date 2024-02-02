@@ -54,6 +54,12 @@ const App = () => {
   const [plainText, setPlainText] = useState('');
   const [cipherText, setCipherText] = useState('');
 
+  const [sync, setSync] = useState(false);
+
+  useEffect(() => {
+    setSync(false);
+  }, [passcode]);
+
   const encrypt = useCallback(async () => {
     setWait(true);
     try {
@@ -92,6 +98,7 @@ const App = () => {
         ),
       ].join('|');
       setCipherText(text);
+      setSync(true);
       await copy(text);
     } catch (e) {
       console.error(e);
@@ -131,6 +138,7 @@ const App = () => {
           )
         )
       );
+      setSync(true);
     } catch (e) {
       console.error(e);
       alert(e);
@@ -195,8 +203,10 @@ const App = () => {
             disabled={wait}
             placeholder="plain text"
             value={plainText}
+            style={{ color: sync ? 'green' : 'red' }}
             onChange={(e) => {
               setPlainText(e.target.value);
+              setSync(false);
             }}
           />
         </section>
@@ -215,8 +225,10 @@ const App = () => {
             spellCheck={false}
             placeholder="cipher text"
             value={cipherText}
+            style={{ color: sync ? 'green' : 'red' }}
             onChange={(e) => {
               setCipherText(e.target.value);
+              setSync(false);
             }}
             onFocus={handleFocus}
           />
