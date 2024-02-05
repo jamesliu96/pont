@@ -30,6 +30,10 @@ section {
   width: 100%;
 }
 
+textarea {
+  resize: vertical;
+}
+
 section {
   display: flex;
   justify-content: center;
@@ -46,7 +50,6 @@ footer {
 }
 
 footer {
-  margin-top: 2em;
   text-align: center;
   color: gray;
   font-size: x-small;

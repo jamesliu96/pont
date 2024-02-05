@@ -2,51 +2,38 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import './App.css';
 
-const encodeText = (str: string) => new TextEncoder().encode(str);
-const decodeText = (bin: BufferSource) => new TextDecoder().decode(bin);
+const [TE, TD] = [new TextEncoder(), new TextDecoder()];
+const [encodeText, decodeText] = [
+  (str: string) => TE.encode(str),
+  (bin: BufferSource) => TD.decode(bin),
+];
 
-const utf8_to_b64 = (str: string) =>
-  btoa(
-    encodeURIComponent(str).replace(/%([\da-f]{2})/gi, (_, p) =>
-      String.fromCharCode(parseInt(p, 16))
-    )
-  );
-const b64_to_utf8 = (str: string) =>
-  decodeURIComponent(
-    [...atob(str)]
-      .map((v) => `%${v.charCodeAt(0).toString(16).padStart(2, '0')}`)
-      .join('')
-  );
+const [encodeBase64, decodeBase64] = [
+  (bin: Uint8Array) => btoa(String.fromCodePoint(...bin)),
+  (str: string) =>
+    Uint8Array.from(atob(str), (v) => v.codePointAt(0) as number),
+];
 
-const encodeBin = (str: string) =>
-  Uint8Array.from([...b64_to_utf8(str)].map((v) => v.charCodeAt(0)));
-const decodeBin = (bin: Uint8Array) => utf8_to_b64(String.fromCharCode(...bin));
-
-const hex_to_ascii = (hex: string) => {
-  if (!hex.length || hex.length % 2) return '';
-  let ascii = '';
-  for (let idx = 0; idx < hex.length; idx += 2)
-    ascii += String.fromCharCode(parseInt(hex.slice(idx, idx + 2), 16));
-  return ascii;
-};
+const [copy, paste] = [
+  async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {}
+  },
+  async () => {
+    try {
+      return await navigator.clipboard.readText();
+    } catch {}
+  },
+];
 
 const parseCipherText = (cipherText: string) => {
-  const [_salt, _iv = '', _cipher = ''] = cipherText.split('|');
-  const salt = encodeBin(_salt);
-  const iv = encodeBin(_iv);
-  const cipher = encodeBin(_cipher);
-  return { salt, iv, cipher };
-};
-
-const copy = async (text: string) => {
-  try {
-    await navigator.clipboard.writeText(text);
-  } catch {}
-};
-const paste = async () => {
-  try {
-    return await navigator.clipboard.readText();
-  } catch {}
+  const [_salt, _iv = '', _cipher = '', aad = undefined] =
+    cipherText.split('|');
+  const salt = decodeBase64(_salt);
+  const iv = decodeBase64(_iv);
+  const cipher = decodeBase64(_cipher);
+  return { salt, iv, cipher, aad };
 };
 
 const CIPHER = 'AES-GCM';
@@ -54,7 +41,8 @@ const CIPHER_LENGTH = 256;
 const PBKDF2 = 'PBKDF2';
 const PBKDF2_ITERATIONS = 1e6;
 const HKDF = 'HKDF';
-const HASH = 'SHA-256';
+const HKDF_INFO = new Uint8Array();
+const HASH = 'SHA-512';
 
 const App = () => {
   const [wait, setWait] = useState(false);
@@ -62,13 +50,12 @@ const App = () => {
 
   const [passcode, setPasscode] = useState('');
 
-  const [plainText, setPlainText] = useState('');
-  const [cipherText, setCipherText] = useState('');
+  const [plaintext, setPlaintext] = useState('');
+  const [ciphertext, setCiphertext] = useState('');
 
-  const [sync, setSync] = useState(false);
-  useEffect(() => {
-    setSync(false);
-  }, [passcode]);
+  const [aad, setAAD] = useState('');
+
+  const [inSync, setInSync] = useState(false);
 
   const [shared, setShared] = useState(false);
   const kdf = useMemo(() => (shared ? HKDF : PBKDF2), [shared]);
@@ -79,15 +66,24 @@ const App = () => {
       const salt = crypto.getRandomValues(new Uint8Array(32));
       const iv = crypto.getRandomValues(new Uint8Array(16));
       const text = [
-        decodeBin(salt),
-        decodeBin(iv),
-        decodeBin(
+        encodeBase64(salt),
+        encodeBase64(iv),
+        encodeBase64(
           new Uint8Array(
             await crypto.subtle.encrypt(
-              { name: CIPHER, iv },
+              {
+                name: CIPHER,
+                iv,
+                ...(aad ? { additionalData: encodeText(aad) } : undefined),
+              },
               await crypto.subtle.deriveKey(
                 kdf === 'HKDF'
-                  ? { name: HKDF, hash: HASH, info: encodeText('PONT'), salt }
+                  ? {
+                      name: HKDF,
+                      hash: HASH,
+                      info: HKDF_INFO,
+                      salt,
+                    }
                   : {
                       name: PBKDF2,
                       hash: HASH,
@@ -105,13 +101,16 @@ const App = () => {
                 false,
                 ['encrypt']
               ),
-              encodeText(plainText)
+              encodeText(plaintext)
             )
           )
         ),
-      ].join('|');
-      setCipherText(text);
-      setSync(true);
+        aad,
+      ]
+        .slice(0, aad ? undefined : 3)
+        .join('|');
+      setCiphertext(text);
+      setInSync(true);
       await copy(text);
     } catch (e) {
       console.error(e);
@@ -119,19 +118,28 @@ const App = () => {
     } finally {
       setWait(false);
     }
-  }, [kdf, passcode, plainText]);
+  }, [aad, kdf, passcode, plaintext]);
 
   const decrypt = useCallback(async () => {
     setWait(true);
     try {
-      const { salt, iv, cipher } = parseCipherText(cipherText);
-      setPlainText(
+      const { salt, iv, cipher, aad } = parseCipherText(ciphertext);
+      setPlaintext(
         decodeText(
           await crypto.subtle.decrypt(
-            { name: CIPHER, iv },
+            {
+              name: CIPHER,
+              iv,
+              ...(aad ? { additionalData: encodeText(aad) } : undefined),
+            },
             await crypto.subtle.deriveKey(
               kdf === 'HKDF'
-                ? { name: HKDF, hash: HASH, info: encodeText('PONT'), salt }
+                ? {
+                    name: HKDF,
+                    hash: HASH,
+                    info: HKDF_INFO,
+                    salt,
+                  }
                 : {
                     name: PBKDF2,
                     hash: HASH,
@@ -153,21 +161,22 @@ const App = () => {
           )
         )
       );
-      setSync(true);
+      if (aad) setAAD(aad);
+      setInSync(true);
     } catch (e) {
       console.error(e);
       alert(e);
     } finally {
       setWait(false);
     }
-  }, [cipherText, kdf, passcode]);
+  }, [ciphertext, kdf, passcode]);
 
   const handleFocus = useCallback(async () => {
     try {
       const text = await paste();
       if (text) {
         const { salt, iv, cipher } = parseCipherText(text);
-        if (salt.length && iv.length && cipher.length) setCipherText(text);
+        if (salt.length && iv.length && cipher.length) setCiphertext(text);
       }
     } catch {}
   }, []);
@@ -175,13 +184,11 @@ const App = () => {
   useEffect(() => {
     const handleMessage = ({
       data,
-    }: MessageEvent<{ hex?: string; bin?: string } | undefined>) => {
-      if (data?.bin) {
+    }: MessageEvent<{ bin?: unknown } | undefined>) => {
+      if (typeof data?.bin === 'string' && data.bin) {
         setPasscode(data.bin);
         setShared(true);
-      } else if (data?.hex) {
-        setPasscode(hex_to_ascii(data.hex));
-        setShared(true);
+        setInSync(false);
       }
     };
     window.addEventListener('message', handleMessage);
@@ -189,6 +196,28 @@ const App = () => {
       window.removeEventListener('message', handleMessage);
     };
   }, []);
+
+  const x = useMemo(
+    () => (inSync ? (shared ? '🔐' : '🔒') : shared ? '🔑' : '🔓'),
+    [shared, inSync]
+  );
+  const y = useMemo(
+    () =>
+      [
+        'PONT',
+        `using ${CIPHER}-${CIPHER_LENGTH}`,
+        `plaintext and ciphertext are ${inSync ? 'IN' : 'OUT OF'} SYNC`,
+        `key IS ${shared ? '' : 'NOT '}shared (using ${
+          shared
+            ? `${HKDF}[${HASH}][${HKDF_INFO}]`
+            : `${PBKDF2}[${HASH}][${PBKDF2_ITERATIONS}]`
+        })`,
+      ].join('\n'),
+    [shared, inSync]
+  );
+  useEffect(() => {
+    console.log(y);
+  }, [y]);
 
   return (
     <div className="App">
@@ -203,13 +232,15 @@ const App = () => {
         <section>
           <input
             disabled={wait}
+            title="passcode or key"
             placeholder="passcode"
             type={shared ? 'password' : focus ? 'text' : 'password'}
             value={passcode}
-            style={{ color: sync ? 'green' : shared ? 'blue' : undefined }}
+            style={{ color: inSync ? 'green' : shared ? 'blue' : undefined }}
             onChange={(e) => {
               setPasscode(e.target.value);
               setShared(false);
+              setInSync(false);
             }}
             onFocus={() => {
               setFocus(true);
@@ -223,20 +254,52 @@ const App = () => {
           <textarea
             rows={5}
             disabled={wait}
-            placeholder="plain text"
-            value={plainText}
-            style={{ color: sync ? 'green' : undefined }}
+            title="plain text"
+            placeholder="plaintext"
+            value={plaintext}
+            style={{ color: inSync ? 'green' : undefined }}
             onChange={(e) => {
-              setPlainText(e.target.value);
-              setSync(false);
+              setPlaintext(e.target.value);
+              setInSync(false);
             }}
           />
         </section>
         <section>
-          <button disabled={wait} onClick={encrypt}>
+          <textarea
+            rows={1}
+            disabled={wait}
+            title="additional authenticated data"
+            placeholder="aad"
+            value={aad}
+            style={{ color: inSync ? 'green' : undefined }}
+            onChange={(e) => {
+              setAAD(e.target.value);
+              setInSync(false);
+            }}
+          />
+        </section>
+        <section>
+          <button
+            disabled={wait}
+            onClick={encrypt}
+            style={{ color: inSync ? 'green' : undefined }}
+          >
             Encrypt
           </button>
-          <button disabled={wait} onClick={decrypt}>
+          <button
+            title={y}
+            onClick={() => {
+              setShared((x) => !x);
+              setInSync(false);
+            }}
+          >
+            {x}
+          </button>
+          <button
+            disabled={wait}
+            onClick={decrypt}
+            style={{ color: inSync ? 'green' : undefined }}
+          >
             Decrypt
           </button>
         </section>
@@ -245,18 +308,19 @@ const App = () => {
             rows={10}
             disabled={wait}
             spellCheck={false}
-            placeholder="cipher text"
-            value={cipherText}
-            style={{ color: sync ? 'green' : undefined }}
+            title="cipher text"
+            placeholder="ciphertext"
+            value={ciphertext}
+            style={{ color: inSync ? 'green' : undefined }}
             onChange={(e) => {
-              setCipherText(e.target.value);
-              setSync(false);
+              setCiphertext(e.target.value);
+              setInSync(false);
             }}
             onFocus={handleFocus}
           />
         </section>
       </main>
-      <footer>
+      <footer style={{ marginTop: '2em' }}>
         <div>powered by</div>
         <div>
           The{' '}
@@ -279,7 +343,7 @@ const App = () => {
           </a>
         </div>
       </footer>
-      <footer>
+      <footer style={{ marginTop: '1em' }}>
         <div>
           <a
             href="https://github.com/jamesliu96/pont"
