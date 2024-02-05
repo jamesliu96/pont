@@ -203,7 +203,7 @@ const App = () => {
             disabled={wait}
             placeholder="plain text"
             value={plainText}
-            style={{ color: sync ? 'green' : 'red' }}
+            style={{ color: sync ? 'green' : undefined }}
             onChange={(e) => {
               setPlainText(e.target.value);
               setSync(false);
@@ -225,7 +225,7 @@ const App = () => {
             spellCheck={false}
             placeholder="cipher text"
             value={cipherText}
-            style={{ color: sync ? 'green' : 'red' }}
+            style={{ color: sync ? 'green' : undefined }}
             onChange={(e) => {
               setCipherText(e.target.value);
               setSync(false);
@@ -254,6 +254,17 @@ const App = () => {
             rel="noreferrer"
           >
             geheim
+          </a>
+        </div>
+      </footer>
+      <footer>
+        <div>
+          <a
+            href="https://github.com/jamesliu96/pont"
+            target="_blank"
+            rel="noreferrer"
+          >
+            🌁
           </a>
         </div>
       </footer>
