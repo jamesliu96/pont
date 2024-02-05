@@ -27,14 +27,34 @@ const [copy, paste] = [
   },
 ];
 
-const parseCipherText = (cipherText: string) => {
-  const [_salt, _iv = '', _cipher = '', aad = undefined] =
-    cipherText.split('|');
-  const salt = decodeBase64(_salt);
-  const iv = decodeBase64(_iv);
-  const cipher = decodeBase64(_cipher);
-  return { salt, iv, cipher, aad };
-};
+const SPLITTER = '|';
+
+const [wrapCipher, unwrapCipher] = [
+  (
+    salt: Uint8Array,
+    nonce: Uint8Array,
+    text: Uint8Array,
+    aad: string | undefined
+  ) =>
+    [
+      encodeBase64(salt),
+      encodeBase64(nonce),
+      encodeBase64(text),
+      ...(aad ? [aad] : []),
+    ].join(SPLITTER),
+  (text: string) => {
+    const [_salt, _nonce = '', _cipher = '', ..._aad] = text.split(SPLITTER);
+    const salt = decodeBase64(_salt);
+    const nonce = decodeBase64(_nonce);
+    const cipher = decodeBase64(_cipher);
+    return {
+      salt,
+      nonce,
+      cipher,
+      aad: _aad.length ? _aad.join(SPLITTER) : undefined,
+    };
+  },
+];
 
 const CIPHER = 'AES-GCM';
 const CIPHER_LENGTH = 256;
@@ -63,51 +83,47 @@ const App = () => {
     setWait(true);
     try {
       const salt = crypto.getRandomValues(new Uint8Array(32));
-      const iv = crypto.getRandomValues(new Uint8Array(16));
-      const text = [
-        encodeBase64(salt),
-        encodeBase64(iv),
-        encodeBase64(
-          new Uint8Array(
-            await crypto.subtle.encrypt(
-              {
-                name: CIPHER,
-                iv,
-                ...(aad ? { additionalData: encodeText(aad) } : undefined),
-              },
-              await crypto.subtle.deriveKey(
-                kdf === 'HKDF'
-                  ? {
-                      name: HKDF,
-                      hash: HASH,
-                      info: HKDF_INFO,
-                      salt,
-                    }
-                  : {
-                      name: PBKDF2,
-                      hash: HASH,
-                      iterations: PBKDF2_ITERATIONS,
-                      salt,
-                    },
-                await crypto.subtle.importKey(
-                  'raw',
-                  encodeText(passcode),
-                  kdf,
-                  false,
-                  ['deriveKey']
-                ),
-                { name: CIPHER, length: CIPHER_LENGTH },
+      const nonce = crypto.getRandomValues(new Uint8Array(16));
+      const text = wrapCipher(
+        salt,
+        nonce,
+        new Uint8Array(
+          await crypto.subtle.encrypt(
+            {
+              name: CIPHER,
+              iv: nonce,
+              ...(aad ? { additionalData: encodeText(aad) } : undefined),
+            },
+            await crypto.subtle.deriveKey(
+              kdf === 'HKDF'
+                ? {
+                    name: HKDF,
+                    hash: HASH,
+                    info: HKDF_INFO,
+                    salt,
+                  }
+                : {
+                    name: PBKDF2,
+                    hash: HASH,
+                    iterations: PBKDF2_ITERATIONS,
+                    salt,
+                  },
+              await crypto.subtle.importKey(
+                'raw',
+                encodeText(passcode),
+                kdf,
                 false,
-                ['encrypt']
+                ['deriveKey']
               ),
-              encodeText(plaintext)
-            )
+              { name: CIPHER, length: CIPHER_LENGTH },
+              false,
+              ['encrypt']
+            ),
+            encodeText(plaintext)
           )
         ),
-        aad,
-      ]
-        .slice(0, aad ? undefined : 3)
-        .join('|');
+        aad
+      );
       setCiphertext(text);
       setSync(true);
       await copy(text);
@@ -122,13 +138,13 @@ const App = () => {
   const decrypt = useCallback(async () => {
     setWait(true);
     try {
-      const { salt, iv, cipher, aad } = parseCipherText(ciphertext);
+      const { salt, nonce, cipher, aad } = unwrapCipher(ciphertext);
       setPlaintext(
         decodeText(
           await crypto.subtle.decrypt(
             {
               name: CIPHER,
-              iv,
+              iv: nonce,
               ...(aad ? { additionalData: encodeText(aad) } : undefined),
             },
             await crypto.subtle.deriveKey(
@@ -174,8 +190,8 @@ const App = () => {
     try {
       const text = await paste();
       if (text) {
-        const { salt, iv, cipher } = parseCipherText(text);
-        if (salt.length && iv.length && cipher.length) setCiphertext(text);
+        const { salt, nonce, cipher } = unwrapCipher(text);
+        if (salt.length && nonce.length && cipher.length) setCiphertext(text);
       }
     } catch {}
   }, []);
@@ -271,7 +287,12 @@ const App = () => {
           <div
             style={{ cursor: 'pointer' }}
             onClick={() => {
-              setShared((x) => !x);
+              setShared(false);
+              setSync(false);
+            }}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              setShared(true);
               setSync(false);
             }}
           >
