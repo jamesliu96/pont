@@ -47,6 +47,7 @@ const HASH = 'SHA-512';
 const App = () => {
   const [wait, setWait] = useState(false);
   const [focus, setFocus] = useState(false);
+  const [sync, setSync] = useState(false);
 
   const [passcode, setPasscode] = useState('');
 
@@ -54,8 +55,6 @@ const App = () => {
   const [ciphertext, setCiphertext] = useState('');
 
   const [aad, setAAD] = useState('');
-
-  const [inSync, setInSync] = useState(false);
 
   const [shared, setShared] = useState(false);
   const kdf = useMemo(() => (shared ? HKDF : PBKDF2), [shared]);
@@ -110,7 +109,7 @@ const App = () => {
         .slice(0, aad ? undefined : 3)
         .join('|');
       setCiphertext(text);
-      setInSync(true);
+      setSync(true);
       await copy(text);
     } catch (e) {
       console.error(e);
@@ -162,7 +161,7 @@ const App = () => {
         )
       );
       if (aad) setAAD(aad);
-      setInSync(true);
+      setSync(true);
     } catch (e) {
       console.error(e);
       alert(e);
@@ -188,7 +187,7 @@ const App = () => {
       if (typeof data?.bin === 'string' && data.bin) {
         setPasscode(data.bin);
         setShared(true);
-        setInSync(false);
+        setSync(false);
       }
     };
     window.addEventListener('message', handleMessage);
@@ -198,26 +197,9 @@ const App = () => {
   }, []);
 
   const x = useMemo(
-    () => (inSync ? (shared ? '🔐' : '🔒') : shared ? '🔑' : '🔓'),
-    [shared, inSync]
+    () => (sync ? (shared ? '🔐' : '🔒') : shared ? '🔑' : '🔓'),
+    [shared, sync]
   );
-  const y = useMemo(
-    () =>
-      [
-        'PONT',
-        `using ${CIPHER}-${CIPHER_LENGTH}`,
-        `plaintext and ciphertext are ${inSync ? 'IN' : 'OUT OF'} SYNC`,
-        `key IS ${shared ? '' : 'NOT '}shared (using ${
-          shared
-            ? `${HKDF}[${HASH}][${HKDF_INFO}]`
-            : `${PBKDF2}[${HASH}][${PBKDF2_ITERATIONS}]`
-        })`,
-      ].join('\n'),
-    [shared, inSync]
-  );
-  useEffect(() => {
-    console.log(y);
-  }, [y]);
 
   return (
     <div className="App">
@@ -236,11 +218,11 @@ const App = () => {
             placeholder="passcode"
             type={shared ? 'password' : focus ? 'text' : 'password'}
             value={passcode}
-            style={{ color: inSync ? 'green' : shared ? 'blue' : undefined }}
+            style={{ color: sync ? 'green' : shared ? 'blue' : undefined }}
             onChange={(e) => {
               setPasscode(e.target.value);
               setShared(false);
-              setInSync(false);
+              setSync(false);
             }}
             onFocus={() => {
               setFocus(true);
@@ -254,13 +236,13 @@ const App = () => {
           <textarea
             rows={5}
             disabled={wait}
-            title="plain text"
+            title="plaintext"
             placeholder="plaintext"
             value={plaintext}
-            style={{ color: inSync ? 'green' : undefined }}
+            style={{ color: sync ? 'green' : undefined }}
             onChange={(e) => {
               setPlaintext(e.target.value);
-              setInSync(false);
+              setSync(false);
             }}
           />
         </section>
@@ -271,34 +253,34 @@ const App = () => {
             title="additional authenticated data"
             placeholder="aad"
             value={aad}
-            style={{ color: inSync ? 'green' : undefined }}
+            style={{ color: sync ? 'green' : undefined }}
             onChange={(e) => {
               setAAD(e.target.value);
-              setInSync(false);
+              setSync(false);
             }}
           />
         </section>
         <section>
           <button
             disabled={wait}
+            style={{ color: sync ? 'green' : undefined }}
             onClick={encrypt}
-            style={{ color: inSync ? 'green' : undefined }}
           >
             Encrypt
           </button>
-          <button
-            title={y}
+          <div
+            style={{ cursor: 'pointer' }}
             onClick={() => {
               setShared((x) => !x);
-              setInSync(false);
+              setSync(false);
             }}
           >
             {x}
-          </button>
+          </div>
           <button
             disabled={wait}
+            style={{ color: sync ? 'green' : undefined }}
             onClick={decrypt}
-            style={{ color: inSync ? 'green' : undefined }}
           >
             Decrypt
           </button>
@@ -308,13 +290,13 @@ const App = () => {
             rows={10}
             disabled={wait}
             spellCheck={false}
-            title="cipher text"
+            title="ciphertext"
             placeholder="ciphertext"
             value={ciphertext}
-            style={{ color: inSync ? 'green' : undefined }}
+            style={{ color: sync ? 'green' : undefined }}
             onChange={(e) => {
               setCiphertext(e.target.value);
-              setInSync(false);
+              setSync(false);
             }}
             onFocus={handleFocus}
           />
