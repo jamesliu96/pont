@@ -51,3 +51,7 @@ footer {
   color: gray;
   font-size: x-small;
 }
+
+a {
+  text-decoration: none;
+}

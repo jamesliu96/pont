@@ -1,16 +1,26 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import './App.css';
-
-const utf8_to_b64 = (str: string) => btoa(unescape(encodeURIComponent(str)));
-const b64_to_utf8 = (str: string) => decodeURIComponent(escape(atob(str)));
 
 const encodeText = (str: string) => new TextEncoder().encode(str);
 const decodeText = (bin: BufferSource) => new TextDecoder().decode(bin);
 
-const encode = (str: string) =>
-  Uint8Array.from([...str].map((c) => c.charCodeAt(0)));
-const decode = (bin: Uint8Array) => String.fromCharCode(...bin);
+const utf8_to_b64 = (str: string) =>
+  btoa(
+    encodeURIComponent(str).replace(/%([\da-f]{2})/gi, (_, p) =>
+      String.fromCharCode(parseInt(p, 16))
+    )
+  );
+const b64_to_utf8 = (str: string) =>
+  decodeURIComponent(
+    [...atob(str)]
+      .map((v) => `%${v.charCodeAt(0).toString(16).padStart(2, '0')}`)
+      .join('')
+  );
+
+const encodeBin = (str: string) =>
+  Uint8Array.from([...b64_to_utf8(str)].map((v) => v.charCodeAt(0)));
+const decodeBin = (bin: Uint8Array) => utf8_to_b64(String.fromCharCode(...bin));
 
 const hex_to_ascii = (hex: string) => {
   if (!hex.length || hex.length % 2) return '';
@@ -22,9 +32,9 @@ const hex_to_ascii = (hex: string) => {
 
 const parseCipherText = (cipherText: string) => {
   const [_salt, _iv = '', _cipher = ''] = cipherText.split('|');
-  const salt = encode(b64_to_utf8(_salt));
-  const iv = encode(b64_to_utf8(_iv));
-  const cipher = encode(b64_to_utf8(_cipher));
+  const salt = encodeBin(_salt);
+  const iv = encodeBin(_iv);
+  const cipher = encodeBin(_cipher);
   return { salt, iv, cipher };
 };
 
@@ -39,10 +49,11 @@ const paste = async () => {
   } catch {}
 };
 
-const KDF = 'PBKDF2';
 const CIPHER = 'AES-GCM';
 const CIPHER_LENGTH = 256;
-const ITERATIONS = 1e6;
+const PBKDF2 = 'PBKDF2';
+const PBKDF2_ITERATIONS = 1e6;
+const HKDF = 'HKDF';
 const HASH = 'SHA-256';
 
 const App = () => {
@@ -55,10 +66,12 @@ const App = () => {
   const [cipherText, setCipherText] = useState('');
 
   const [sync, setSync] = useState(false);
-
   useEffect(() => {
     setSync(false);
   }, [passcode]);
+
+  const [shared, setShared] = useState(false);
+  const kdf = useMemo(() => (shared ? HKDF : PBKDF2), [shared]);
 
   const encrypt = useCallback(async () => {
     setWait(true);
@@ -66,33 +79,33 @@ const App = () => {
       const salt = crypto.getRandomValues(new Uint8Array(32));
       const iv = crypto.getRandomValues(new Uint8Array(16));
       const text = [
-        utf8_to_b64(decode(salt)),
-        utf8_to_b64(decode(iv)),
-        utf8_to_b64(
-          decode(
-            new Uint8Array(
-              await crypto.subtle.encrypt(
-                { name: CIPHER, iv },
-                await crypto.subtle.deriveKey(
-                  {
-                    name: KDF,
-                    salt,
-                    iterations: ITERATIONS,
-                    hash: HASH,
-                  },
-                  await crypto.subtle.importKey(
-                    'raw',
-                    encodeText(passcode),
-                    { name: KDF },
-                    false,
-                    ['deriveKey']
-                  ),
-                  { name: CIPHER, length: CIPHER_LENGTH },
-                  true,
-                  ['encrypt']
+        decodeBin(salt),
+        decodeBin(iv),
+        decodeBin(
+          new Uint8Array(
+            await crypto.subtle.encrypt(
+              { name: CIPHER, iv },
+              await crypto.subtle.deriveKey(
+                kdf === 'HKDF'
+                  ? { name: HKDF, hash: HASH, info: encodeText('PONT'), salt }
+                  : {
+                      name: PBKDF2,
+                      hash: HASH,
+                      iterations: PBKDF2_ITERATIONS,
+                      salt,
+                    },
+                await crypto.subtle.importKey(
+                  'raw',
+                  encodeText(passcode),
+                  kdf,
+                  false,
+                  ['deriveKey']
                 ),
-                encodeText(plainText)
-              )
+                { name: CIPHER, length: CIPHER_LENGTH },
+                false,
+                ['encrypt']
+              ),
+              encodeText(plainText)
             )
           )
         ),
@@ -106,7 +119,7 @@ const App = () => {
     } finally {
       setWait(false);
     }
-  }, [passcode, plainText]);
+  }, [kdf, passcode, plainText]);
 
   const decrypt = useCallback(async () => {
     setWait(true);
@@ -117,21 +130,23 @@ const App = () => {
           await crypto.subtle.decrypt(
             { name: CIPHER, iv },
             await crypto.subtle.deriveKey(
-              {
-                name: KDF,
-                salt,
-                iterations: ITERATIONS,
-                hash: HASH,
-              },
+              kdf === 'HKDF'
+                ? { name: HKDF, hash: HASH, info: encodeText('PONT'), salt }
+                : {
+                    name: PBKDF2,
+                    hash: HASH,
+                    iterations: PBKDF2_ITERATIONS,
+                    salt,
+                  },
               await crypto.subtle.importKey(
                 'raw',
                 encodeText(passcode),
-                { name: KDF },
+                kdf,
                 false,
                 ['deriveKey']
               ),
               { name: CIPHER, length: CIPHER_LENGTH },
-              true,
+              false,
               ['decrypt']
             ),
             cipher
@@ -145,7 +160,7 @@ const App = () => {
     } finally {
       setWait(false);
     }
-  }, [passcode, cipherText]);
+  }, [cipherText, kdf, passcode]);
 
   const handleFocus = useCallback(async () => {
     try {
@@ -161,8 +176,13 @@ const App = () => {
     const handleMessage = ({
       data,
     }: MessageEvent<{ hex?: string; bin?: string } | undefined>) => {
-      if (data?.bin) setPasscode(data.bin);
-      else if (data?.hex) setPasscode(hex_to_ascii(data.hex));
+      if (data?.bin) {
+        setPasscode(data.bin);
+        setShared(true);
+      } else if (data?.hex) {
+        setPasscode(hex_to_ascii(data.hex));
+        setShared(true);
+      }
     };
     window.addEventListener('message', handleMessage);
     return () => {
@@ -184,10 +204,12 @@ const App = () => {
           <input
             disabled={wait}
             placeholder="passcode"
-            type={focus ? 'text' : 'password'}
+            type={shared ? 'password' : focus ? 'text' : 'password'}
             value={passcode}
+            style={{ color: sync ? 'green' : shared ? 'blue' : undefined }}
             onChange={(e) => {
               setPasscode(e.target.value);
+              setShared(false);
             }}
             onFocus={() => {
               setFocus(true);
