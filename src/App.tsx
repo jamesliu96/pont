@@ -57,7 +57,9 @@ const [wrapCipher, unwrapCipher] = [
 ];
 
 const CIPHER = 'AES-GCM';
-const CIPHER_LENGTH = 256;
+const CIPHER_KEY_LENGTH = 32;
+const SALT_LENGTH = 32;
+const NONCE_LENGTH = 16;
 const PBKDF2 = 'PBKDF2';
 const PBKDF2_ITERATIONS = 1e6;
 const HKDF = 'HKDF';
@@ -82,8 +84,8 @@ const App = () => {
   const encrypt = useCallback(async () => {
     setWait(true);
     try {
-      const salt = crypto.getRandomValues(new Uint8Array(32));
-      const nonce = crypto.getRandomValues(new Uint8Array(16));
+      const salt = crypto.getRandomValues(new Uint8Array(SALT_LENGTH));
+      const nonce = crypto.getRandomValues(new Uint8Array(NONCE_LENGTH));
       const text = wrapCipher(
         salt,
         nonce,
@@ -115,7 +117,7 @@ const App = () => {
                 false,
                 ['deriveKey']
               ),
-              { name: CIPHER, length: CIPHER_LENGTH },
+              { name: CIPHER, length: CIPHER_KEY_LENGTH * 8 },
               false,
               ['encrypt']
             ),
@@ -168,7 +170,7 @@ const App = () => {
                 false,
                 ['deriveKey']
               ),
-              { name: CIPHER, length: CIPHER_LENGTH },
+              { name: CIPHER, length: CIPHER_KEY_LENGTH * 8 },
               false,
               ['decrypt']
             ),
@@ -212,7 +214,7 @@ const App = () => {
     };
   }, []);
 
-  const x = useMemo(
+  const icon = useMemo(
     () => (sync ? (shared ? '🔐' : '🔒') : shared ? '🔑' : '🔓'),
     [shared, sync]
   );
@@ -250,12 +252,12 @@ const App = () => {
         </section>
         <section>
           <textarea
-            rows={5}
+            rows={4}
             disabled={wait}
             title="plaintext"
             placeholder="plaintext"
             value={plaintext}
-            style={{ color: sync ? 'green' : undefined }}
+            style={{ color: sync ? 'green' : shared ? 'blue' : undefined }}
             onChange={(e) => {
               setPlaintext(e.target.value);
               setSync(false);
@@ -269,7 +271,7 @@ const App = () => {
             title="additional authenticated data"
             placeholder="aad"
             value={aad}
-            style={{ color: sync ? 'green' : undefined }}
+            style={{ color: sync ? 'green' : shared ? 'blue' : undefined }}
             onChange={(e) => {
               setAAD(e.target.value);
               setSync(false);
@@ -279,7 +281,7 @@ const App = () => {
         <section>
           <button
             disabled={wait}
-            style={{ color: sync ? 'green' : undefined }}
+            style={{ color: sync ? 'green' : shared ? 'blue' : undefined }}
             onClick={encrypt}
           >
             Encrypt
@@ -292,15 +294,16 @@ const App = () => {
             }}
             onContextMenu={(e) => {
               e.preventDefault();
+              if (!prompt('sure?', 'yes')) return;
               setShared(true);
               setSync(false);
             }}
           >
-            {x}
+            {icon}
           </div>
           <button
             disabled={wait}
-            style={{ color: sync ? 'green' : undefined }}
+            style={{ color: sync ? 'green' : shared ? 'blue' : undefined }}
             onClick={decrypt}
           >
             Decrypt
@@ -308,13 +311,13 @@ const App = () => {
         </section>
         <section>
           <textarea
-            rows={10}
+            rows={8}
             disabled={wait}
             spellCheck={false}
             title="ciphertext"
             placeholder="ciphertext"
             value={ciphertext}
-            style={{ color: sync ? 'green' : undefined }}
+            style={{ color: sync ? 'green' : shared ? 'blue' : undefined }}
             onChange={(e) => {
               setCiphertext(e.target.value);
               setSync(false);
