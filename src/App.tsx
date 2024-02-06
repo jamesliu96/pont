@@ -56,14 +56,12 @@ const [wrapCipher, unwrapCipher] = [
   },
 ];
 
-const CIPHER = 'AES-GCM';
-const CIPHER_KEY_LENGTH = 32;
+const AES_GCM = 'AES-GCM';
+const AES_GCM_KEY_LENGTH = 32;
 const SALT_LENGTH = 32;
 const NONCE_LENGTH = 16;
 const PBKDF2 = 'PBKDF2';
 const PBKDF2_ITERATIONS = 1e6;
-const HKDF = 'HKDF';
-const HKDF_INFO = new Uint8Array();
 const HASH = 'SHA-512';
 
 const App = () => {
@@ -79,7 +77,6 @@ const App = () => {
   const [aad, setAAD] = useState('');
 
   const [shared, setShared] = useState(false);
-  const kdf = useMemo(() => (shared ? HKDF : PBKDF2), [shared]);
 
   const encrypt = useCallback(async () => {
     setWait(true);
@@ -92,32 +89,25 @@ const App = () => {
         new Uint8Array(
           await crypto.subtle.encrypt(
             {
-              name: CIPHER,
+              name: AES_GCM,
               iv: nonce,
               ...(aad ? { additionalData: encodeText(aad) } : undefined),
             },
             await crypto.subtle.deriveKey(
-              kdf === 'HKDF'
-                ? {
-                    name: HKDF,
-                    hash: HASH,
-                    info: HKDF_INFO,
-                    salt,
-                  }
-                : {
-                    name: PBKDF2,
-                    hash: HASH,
-                    iterations: PBKDF2_ITERATIONS,
-                    salt,
-                  },
+              {
+                name: PBKDF2,
+                hash: HASH,
+                iterations: PBKDF2_ITERATIONS,
+                salt,
+              },
               await crypto.subtle.importKey(
                 'raw',
                 encodeText(passcode),
-                kdf,
+                PBKDF2,
                 false,
                 ['deriveKey']
               ),
-              { name: CIPHER, length: CIPHER_KEY_LENGTH * 8 },
+              { name: AES_GCM, length: AES_GCM_KEY_LENGTH * 8 },
               false,
               ['encrypt']
             ),
@@ -135,7 +125,7 @@ const App = () => {
     } finally {
       setWait(false);
     }
-  }, [aad, kdf, passcode, plaintext]);
+  }, [aad, passcode, plaintext]);
 
   const decrypt = useCallback(async () => {
     setWait(true);
@@ -145,32 +135,25 @@ const App = () => {
         decodeText(
           await crypto.subtle.decrypt(
             {
-              name: CIPHER,
+              name: AES_GCM,
               iv: nonce,
               ...(aad ? { additionalData: encodeText(aad) } : undefined),
             },
             await crypto.subtle.deriveKey(
-              kdf === 'HKDF'
-                ? {
-                    name: HKDF,
-                    hash: HASH,
-                    info: HKDF_INFO,
-                    salt,
-                  }
-                : {
-                    name: PBKDF2,
-                    hash: HASH,
-                    iterations: PBKDF2_ITERATIONS,
-                    salt,
-                  },
+              {
+                name: PBKDF2,
+                hash: HASH,
+                iterations: PBKDF2_ITERATIONS,
+                salt,
+              },
               await crypto.subtle.importKey(
                 'raw',
                 encodeText(passcode),
-                kdf,
+                PBKDF2,
                 false,
                 ['deriveKey']
               ),
-              { name: CIPHER, length: CIPHER_KEY_LENGTH * 8 },
+              { name: AES_GCM, length: AES_GCM_KEY_LENGTH * 8 },
               false,
               ['decrypt']
             ),
@@ -186,7 +169,7 @@ const App = () => {
     } finally {
       setWait(false);
     }
-  }, [ciphertext, kdf, passcode]);
+  }, [ciphertext, passcode]);
 
   const handleFocus = useCallback(async () => {
     try {
@@ -286,21 +269,7 @@ const App = () => {
           >
             Encrypt
           </button>
-          <div
-            style={{ cursor: 'pointer' }}
-            onClick={() => {
-              setShared(false);
-              setSync(false);
-            }}
-            onContextMenu={(e) => {
-              e.preventDefault();
-              if (!prompt('sure?', 'yes')) return;
-              setShared(true);
-              setSync(false);
-            }}
-          >
-            {icon}
-          </div>
+          <div>{icon}</div>
           <button
             disabled={wait}
             style={{ color: sync ? 'green' : shared ? 'blue' : undefined }}
