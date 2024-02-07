@@ -2,6 +2,11 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import './App.css';
 
+const [encodeRaw] = [
+  (str: string) => Uint8Array.from(str, (v) => v.charCodeAt(0)),
+  (bin: Uint8Array) => String.fromCharCode(...bin),
+];
+
 const [TE, TD] = [new TextEncoder(), new TextDecoder()];
 const [encodeText, decodeText] = [
   (str: string) => TE.encode(str),
@@ -108,7 +113,7 @@ const App = () => {
                   },
               await crypto.subtle.importKey(
                 'raw',
-                encodeText(key),
+                KDF === HKDF ? encodeRaw(key) : encodeText(key),
                 KDF,
                 false,
                 ['deriveKey']
@@ -156,7 +161,7 @@ const App = () => {
                   },
               await crypto.subtle.importKey(
                 'raw',
-                encodeText(key),
+                KDF === HKDF ? encodeRaw(key) : encodeText(key),
                 KDF,
                 false,
                 ['deriveKey']
