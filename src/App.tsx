@@ -62,6 +62,8 @@ const SALT_LENGTH = 32;
 const NONCE_LENGTH = 16;
 const PBKDF2 = 'PBKDF2';
 const PBKDF2_ITERATIONS = 1e6;
+const HKDF = 'HKDF';
+const HKDF_INFO = new Uint8Array();
 const HASH = 'SHA-512';
 
 const App = () => {
@@ -69,7 +71,7 @@ const App = () => {
   const [focus, setFocus] = useState(false);
   const [sync, setSync] = useState(false);
 
-  const [passcode, setPasscode] = useState('');
+  const [key, setKey] = useState('');
 
   const [plaintext, setPlaintext] = useState('');
   const [ciphertext, setCiphertext] = useState('');
@@ -77,6 +79,8 @@ const App = () => {
   const [aad, setAAD] = useState('');
 
   const [shared, setShared] = useState(false);
+
+  const KDF = useMemo(() => (shared ? HKDF : PBKDF2), [shared]);
 
   const encrypt = useCallback(async () => {
     setWait(true);
@@ -94,16 +98,18 @@ const App = () => {
               ...(aad ? { additionalData: encodeText(aad) } : undefined),
             },
             await crypto.subtle.deriveKey(
-              {
-                name: PBKDF2,
-                hash: HASH,
-                iterations: PBKDF2_ITERATIONS,
-                salt,
-              },
+              KDF === HKDF
+                ? { name: HKDF, hash: HASH, info: HKDF_INFO, salt }
+                : {
+                    name: PBKDF2,
+                    hash: HASH,
+                    iterations: PBKDF2_ITERATIONS,
+                    salt,
+                  },
               await crypto.subtle.importKey(
                 'raw',
-                encodeText(passcode),
-                PBKDF2,
+                encodeText(key),
+                KDF,
                 false,
                 ['deriveKey']
               ),
@@ -125,7 +131,7 @@ const App = () => {
     } finally {
       setWait(false);
     }
-  }, [aad, passcode, plaintext]);
+  }, [aad, KDF, key, plaintext]);
 
   const decrypt = useCallback(async () => {
     setWait(true);
@@ -140,16 +146,18 @@ const App = () => {
               ...(aad ? { additionalData: encodeText(aad) } : undefined),
             },
             await crypto.subtle.deriveKey(
-              {
-                name: PBKDF2,
-                hash: HASH,
-                iterations: PBKDF2_ITERATIONS,
-                salt,
-              },
+              KDF === HKDF
+                ? { name: HKDF, hash: HASH, info: HKDF_INFO, salt }
+                : {
+                    name: PBKDF2,
+                    hash: HASH,
+                    iterations: PBKDF2_ITERATIONS,
+                    salt,
+                  },
               await crypto.subtle.importKey(
                 'raw',
-                encodeText(passcode),
-                PBKDF2,
+                encodeText(key),
+                KDF,
                 false,
                 ['deriveKey']
               ),
@@ -169,7 +177,7 @@ const App = () => {
     } finally {
       setWait(false);
     }
-  }, [ciphertext, passcode]);
+  }, [ciphertext, KDF, key]);
 
   const handleFocus = useCallback(async () => {
     try {
@@ -186,7 +194,7 @@ const App = () => {
       data,
     }: MessageEvent<{ bin?: unknown } | undefined>) => {
       if (typeof data?.bin === 'string' && data.bin) {
-        setPasscode(data.bin);
+        setKey(data.bin);
         setShared(true);
         setSync(false);
       }
@@ -215,13 +223,12 @@ const App = () => {
         <section>
           <input
             disabled={wait}
-            title="passcode or key"
-            placeholder="passcode"
+            placeholder="key"
             type={shared ? 'password' : focus ? 'text' : 'password'}
-            value={passcode}
+            value={key}
             style={{ color: sync ? 'green' : shared ? 'blue' : undefined }}
             onChange={(e) => {
-              setPasscode(e.target.value);
+              setKey(e.target.value);
               setShared(false);
               setSync(false);
             }}
@@ -237,7 +244,6 @@ const App = () => {
           <textarea
             rows={4}
             disabled={wait}
-            title="plaintext"
             placeholder="plaintext"
             value={plaintext}
             style={{ color: sync ? 'green' : shared ? 'blue' : undefined }}
@@ -269,7 +275,17 @@ const App = () => {
           >
             Encrypt
           </button>
-          <div>{icon}</div>
+          <div
+            style={{ cursor: wait ? undefined : 'pointer' }}
+            onContextMenu={(e) => {
+              if (wait) return;
+              e.preventDefault();
+              setShared(false);
+              setSync(false);
+            }}
+          >
+            {icon}
+          </div>
           <button
             disabled={wait}
             style={{ color: sync ? 'green' : shared ? 'blue' : undefined }}
@@ -283,7 +299,6 @@ const App = () => {
             rows={8}
             disabled={wait}
             spellCheck={false}
-            title="ciphertext"
             placeholder="ciphertext"
             value={ciphertext}
             style={{ color: sync ? 'green' : shared ? 'blue' : undefined }}
