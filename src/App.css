@@ -58,29 +58,3 @@ footer {
 a {
   text-decoration: none;
 }
-
-@keyframes wait {
-  0% {
-    --content: '⏳';
-    transform: rotate(0deg);
-  }
-
-  50% {
-    --content: '⌛';
-    transform: rotate(0deg);
-  }
-
-  100% {
-    --content: '⌛';
-    transform: rotate(180deg);
-  }
-}
-
-.wait {
-  transform: rotate(0deg);
-  animation: wait 1.5s linear infinite;
-}
-
-.wait::before {
-  content: var(--content);
-}
