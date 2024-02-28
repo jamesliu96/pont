@@ -1,4 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  CSSProperties,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 
 import './App.css';
 
@@ -48,7 +54,7 @@ const [wrapCipher, unwrapCipher] = [
       ...(aad ? [aad] : []),
     ].join(SPLITTER),
   (text: string) => {
-    const [_salt, _nonce = '', _cipher = '', ..._aad] = text.split(SPLITTER);
+    const [_salt, _nonce = '', _cipher = '', ...aad] = text.split(SPLITTER);
     const salt = decodeBase64(_salt);
     const nonce = decodeBase64(_nonce);
     const cipher = decodeBase64(_cipher);
@@ -56,7 +62,7 @@ const [wrapCipher, unwrapCipher] = [
       salt,
       nonce,
       cipher,
-      aad: _aad.length ? _aad.join(SPLITTER) : undefined,
+      aad: aad.length ? aad.join(SPLITTER) : undefined,
     };
   },
 ];
@@ -215,6 +221,21 @@ const App = () => {
     [shared, sync]
   );
 
+  const style = useMemo(
+    () =>
+      ({
+        color:
+          sync && shared
+            ? 'teal'
+            : sync
+            ? 'green'
+            : shared
+            ? 'blue'
+            : undefined,
+      } as CSSProperties),
+    [shared, sync]
+  );
+
   return (
     <div className="App">
       <main>
@@ -231,7 +252,7 @@ const App = () => {
             placeholder="key"
             type={shared ? 'password' : focus ? 'text' : 'password'}
             value={key}
-            style={{ color: sync ? 'green' : shared ? 'blue' : undefined }}
+            style={style}
             onChange={(e) => {
               setKey(e.target.value);
               setShared(false);
@@ -251,7 +272,7 @@ const App = () => {
             disabled={wait}
             placeholder="plaintext"
             value={plaintext}
-            style={{ color: sync ? 'green' : shared ? 'blue' : undefined }}
+            style={style}
             onChange={(e) => {
               setPlaintext(e.target.value);
               setSync(false);
@@ -265,7 +286,7 @@ const App = () => {
             title="additional authenticated data"
             placeholder="aad"
             value={aad}
-            style={{ color: sync ? 'green' : shared ? 'blue' : undefined }}
+            style={style}
             onChange={(e) => {
               setAAD(e.target.value);
               setSync(false);
@@ -273,11 +294,7 @@ const App = () => {
           />
         </section>
         <section>
-          <button
-            disabled={wait}
-            style={{ color: sync ? 'green' : shared ? 'blue' : undefined }}
-            onClick={encrypt}
-          >
+          <button disabled={wait} style={style} onClick={encrypt}>
             Encrypt
           </button>
           <div
@@ -291,11 +308,7 @@ const App = () => {
           >
             {icon}
           </div>
-          <button
-            disabled={wait}
-            style={{ color: sync ? 'green' : shared ? 'blue' : undefined }}
-            onClick={decrypt}
-          >
+          <button disabled={wait} style={style} onClick={decrypt}>
             Decrypt
           </button>
         </section>
@@ -306,7 +319,7 @@ const App = () => {
             spellCheck={false}
             placeholder="ciphertext"
             value={ciphertext}
-            style={{ color: sync ? 'green' : shared ? 'blue' : undefined }}
+            style={style}
             onChange={(e) => {
               setCiphertext(e.target.value);
               setSync(false);
