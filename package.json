@@ -16,6 +16,9 @@
     "typescript": "^4.9.5",
     "web-vitals": "^2.1.4"
   },
+  "devDependencies": {
+    "@types/golang-wasm-exec": "^1.15.2"
+  },
   "scripts": {
     "start": "react-scripts start",
     "build": "react-scripts build",

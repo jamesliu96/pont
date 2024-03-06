@@ -8,6 +8,8 @@ import {
 
 import './App.css';
 
+import './wasm_exec.js';
+
 const [encodeRaw] = [
   (str: string) => Uint8Array.from(str, (v) => v.charCodeAt(0)),
   (bin: Uint8Array) => String.fromCharCode(...bin),
@@ -91,6 +93,12 @@ const App = () => {
 
   const [shared, setShared] = useState(false);
 
+  const [wasm, setWasm] = useState(false);
+
+  const [chacha, setChacha] = useState(true);
+
+  const wasmed = useMemo(() => wasm && shared, [shared, wasm]);
+
   const KDF = useMemo(() => (shared ? HKDF : PBKDF2), [shared]);
 
   const encrypt = useCallback(async () => {
@@ -98,41 +106,48 @@ const App = () => {
     try {
       const salt = crypto.getRandomValues(new Uint8Array(SALT_LENGTH));
       const nonce = crypto.getRandomValues(new Uint8Array(NONCE_LENGTH));
-      const text = wrapCipher(
-        salt,
-        nonce,
-        new Uint8Array(
-          await crypto.subtle.encrypt(
-            {
-              name: AES_GCM,
-              iv: nonce,
-              ...(aad ? { additionalData: encodeText(aad) } : undefined),
-            },
-            await crypto.subtle.deriveKey(
-              KDF === HKDF
-                ? { name: HKDF, hash: HASH, info: HKDF_INFO, salt }
-                : {
-                    name: PBKDF2,
-                    hash: HASH,
-                    iterations: PBKDF2_ITERATIONS,
-                    salt,
-                  },
-              await crypto.subtle.importKey(
-                'raw',
-                KDF === HKDF ? encodeRaw(key) : encodeText(key),
-                KDF,
-                false,
-                ['deriveKey']
-              ),
-              { name: AES_GCM, length: AES_GCM_KEY_LENGTH * 8 },
-              false,
-              ['encrypt']
-            ),
-            encodeText(plaintext)
+      const text = wasmed
+        ? await pont$$encrypt(
+            chacha ? 'ChaCha20-Poly1305' : 'AES-256-GCM',
+            key,
+            plaintext,
+            aad
           )
-        ),
-        aad
-      );
+        : wrapCipher(
+            salt,
+            nonce,
+            new Uint8Array(
+              await crypto.subtle.encrypt(
+                {
+                  name: AES_GCM,
+                  iv: nonce,
+                  ...(aad ? { additionalData: encodeText(aad) } : undefined),
+                },
+                await crypto.subtle.deriveKey(
+                  KDF === HKDF
+                    ? { name: HKDF, hash: HASH, info: HKDF_INFO, salt }
+                    : {
+                        name: PBKDF2,
+                        hash: HASH,
+                        iterations: PBKDF2_ITERATIONS,
+                        salt,
+                      },
+                  await crypto.subtle.importKey(
+                    'raw',
+                    KDF === HKDF ? encodeRaw(key) : encodeText(key),
+                    KDF,
+                    false,
+                    ['deriveKey']
+                  ),
+                  { name: AES_GCM, length: AES_GCM_KEY_LENGTH * 8 },
+                  false,
+                  ['encrypt']
+                ),
+                encodeText(plaintext)
+              )
+            ),
+            aad
+          );
       setCiphertext(text);
       setSync(true);
       await copy(text);
@@ -142,45 +157,52 @@ const App = () => {
     } finally {
       setWait(false);
     }
-  }, [aad, KDF, key, plaintext]);
+  }, [wasmed, chacha, key, plaintext, aad, KDF]);
 
   const decrypt = useCallback(async () => {
     setWait(true);
     try {
-      const { salt, nonce, cipher, aad } = unwrapCipher(ciphertext);
-      setPlaintext(
-        decodeText(
-          await crypto.subtle.decrypt(
-            {
-              name: AES_GCM,
-              iv: nonce,
-              ...(aad ? { additionalData: encodeText(aad) } : undefined),
-            },
-            await crypto.subtle.deriveKey(
-              KDF === HKDF
-                ? { name: HKDF, hash: HASH, info: HKDF_INFO, salt }
-                : {
-                    name: PBKDF2,
-                    hash: HASH,
-                    iterations: PBKDF2_ITERATIONS,
-                    salt,
-                  },
-              await crypto.subtle.importKey(
-                'raw',
-                KDF === HKDF ? encodeRaw(key) : encodeText(key),
-                KDF,
+      if (wasmed) {
+        const { suite, plaintext, aad } = await pont$$decrypt(key, ciphertext);
+        setChacha(suite === 'ChaCha20-Poly1305');
+        setPlaintext(plaintext);
+        setAAD(aad);
+      } else {
+        const { salt, nonce, cipher, aad } = unwrapCipher(ciphertext);
+        setPlaintext(
+          decodeText(
+            await crypto.subtle.decrypt(
+              {
+                name: AES_GCM,
+                iv: nonce,
+                ...(aad ? { additionalData: encodeText(aad) } : undefined),
+              },
+              await crypto.subtle.deriveKey(
+                KDF === HKDF
+                  ? { name: HKDF, hash: HASH, info: HKDF_INFO, salt }
+                  : {
+                      name: PBKDF2,
+                      hash: HASH,
+                      iterations: PBKDF2_ITERATIONS,
+                      salt,
+                    },
+                await crypto.subtle.importKey(
+                  'raw',
+                  KDF === HKDF ? encodeRaw(key) : encodeText(key),
+                  KDF,
+                  false,
+                  ['deriveKey']
+                ),
+                { name: AES_GCM, length: AES_GCM_KEY_LENGTH * 8 },
                 false,
-                ['deriveKey']
+                ['decrypt']
               ),
-              { name: AES_GCM, length: AES_GCM_KEY_LENGTH * 8 },
-              false,
-              ['decrypt']
-            ),
-            cipher
+              cipher
+            )
           )
-        )
-      );
-      if (aad) setAAD(aad);
+        );
+        setAAD(aad ?? '');
+      }
       setSync(true);
     } catch (e) {
       console.error(e);
@@ -188,7 +210,7 @@ const App = () => {
     } finally {
       setWait(false);
     }
-  }, [ciphertext, KDF, key]);
+  }, [wasmed, key, ciphertext, KDF]);
 
   const handleFocus = useCallback(async () => {
     try {
@@ -198,22 +220,6 @@ const App = () => {
         if (salt.length && nonce.length && cipher.length) setCiphertext(text);
       }
     } catch {}
-  }, []);
-
-  useEffect(() => {
-    const handleMessage = ({
-      data,
-    }: MessageEvent<{ bin?: unknown } | undefined>) => {
-      if (typeof data?.bin === 'string' && data.bin) {
-        setKey(data.bin);
-        setShared(true);
-        setSync(false);
-      }
-    };
-    window.addEventListener('message', handleMessage);
-    return () => {
-      window.removeEventListener('message', handleMessage);
-    };
   }, []);
 
   const icon = useMemo(
@@ -235,6 +241,38 @@ const App = () => {
       } as CSSProperties),
     [shared, sync]
   );
+
+  useEffect(() => {
+    (async () => {
+      const go = new Go();
+      const { instance } = await WebAssembly.instantiateStreaming(
+        Promise.race([
+          fetch('pont.wasm'),
+          fetch(
+            'https://cdn.jsdelivr.net/gh/jamesliu96/geheimnis@gh-pages/pont.wasm'
+          ).catch(() => new Promise<Response>(() => {})),
+        ]),
+        go.importObject
+      );
+      await go.run(instance);
+    })();
+    const handleMessage = ({
+      data,
+    }: MessageEvent<{ bin?: unknown; $$?: unknown } | undefined>) => {
+      if (typeof data?.bin === 'string' && data.bin) {
+        setKey(data.bin);
+        setShared(true);
+        setSync(false);
+      }
+      if (data?.$$) {
+        setWasm(true);
+      }
+    };
+    window.addEventListener('message', handleMessage);
+    return () => {
+      window.removeEventListener('message', handleMessage);
+    };
+  }, []);
 
   return (
     <div className="App">
@@ -293,6 +331,44 @@ const App = () => {
             }}
           />
         </section>
+        {wasmed ? (
+          <>
+            <section
+              style={{ textWrap: 'nowrap', fontSize: 'x-small', width: 'auto' }}
+            >
+              <input
+                type="radio"
+                id="chacha"
+                checked={chacha}
+                style={{ margin: 0 }}
+                onChange={() => {
+                  setChacha(true);
+                  setSync(false);
+                }}
+              />
+              <label htmlFor="chacha" style={style}>
+                ChaCha20-Poly1305
+              </label>
+            </section>
+            <section
+              style={{ textWrap: 'nowrap', fontSize: 'x-small', width: 'auto' }}
+            >
+              <input
+                type="radio"
+                id="aes"
+                checked={!chacha}
+                style={{ margin: 0 }}
+                onChange={() => {
+                  setChacha(false);
+                  setSync(false);
+                }}
+              />
+              <label htmlFor="aes" style={style}>
+                AES-256-GCM
+              </label>
+            </section>
+          </>
+        ) : null}
         <section>
           <button disabled={wait} style={style} onClick={encrypt}>
             Encrypt
@@ -331,17 +407,6 @@ const App = () => {
       <footer style={{ marginTop: '2em' }}>
         <div>powered by</div>
         <div>
-          The{' '}
-          <a
-            href="https://www.w3.org/TR/WebCryptoAPI/"
-            target="_blank"
-            rel="noreferrer"
-          >
-            Web Crypto API
-          </a>
-        </div>
-        <div>and</div>
-        <div>
           <a
             href="https://geheim.jamesliu.info"
             target="_blank"
@@ -350,6 +415,34 @@ const App = () => {
             geheim
           </a>
         </div>
+        {wasmed ? (
+          <>
+            <div>+</div>
+            <div>
+              <a
+                href="https://github.com/jamesliu96/ego"
+                target="_blank"
+                rel="noreferrer"
+              >
+                ego
+              </a>
+            </div>
+          </>
+        ) : (
+          <>
+            <div>and</div>
+            <div>
+              The{' '}
+              <a
+                href="https://www.w3.org/TR/WebCryptoAPI/"
+                target="_blank"
+                rel="noreferrer"
+              >
+                Web Crypto API
+              </a>
+            </div>
+          </>
+        )}
       </footer>
       <footer style={{ marginTop: '1em' }}>
         <div>
