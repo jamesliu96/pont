@@ -249,7 +249,7 @@ const App = () => {
         Promise.race([
           fetch('pont.wasm'),
           fetch(
-            'https://cdn.jsdelivr.net/gh/jamesliu96/geheimnis@gh-pages/pont.wasm'
+            'https://cdn.jsdelivr.net/gh/jamesliu96/pont@gh-pages/pont.wasm'
           ).catch(() => new Promise<Response>(() => {})),
         ]),
         go.importObject
