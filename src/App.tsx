@@ -99,13 +99,10 @@ const App = () => {
 
   const [plaintext, setPlaintext] = useState('');
   const [ciphertext, setCiphertext] = useState('');
-
   const [aad, setAAD] = useState('');
 
   const [shared, setShared] = useState(false);
-
   const [wasm, setWasm] = useState(false);
-
   const [chacha, setChacha] = useState(true);
 
   const encrypt = useCallback(async () => {
@@ -222,17 +219,26 @@ const App = () => {
       if (text) {
         let { salt, nonce, cipher } = splitCipher(text);
         if (salt.length && nonce.length && cipher.length) {
-          setCiphertext(text);
+          setCiphertext((ciphertext) => {
+            if (ciphertext !== text) setSync(false);
+            return text;
+          });
           return;
         }
         ({ salt, nonce, cipher } = splitCipher(text, '#'));
         if (salt.length && nonce.length && cipher.length) {
-          setCiphertext(text);
+          setCiphertext((ciphertext) => {
+            if (ciphertext !== text) setSync(false);
+            return text;
+          });
           return;
         }
         ({ salt, nonce, cipher } = splitCipher(text, '$'));
         if (salt.length && nonce.length && cipher.length) {
-          setCiphertext(text);
+          setCiphertext((ciphertext) => {
+            if (ciphertext !== text) setSync(false);
+            return text;
+          });
           return;
         }
       }
@@ -283,10 +289,13 @@ const App = () => {
     const handleMessage = ({
       data,
     }: MessageEvent<{ bin: unknown; $$: unknown } | undefined>) => {
-      if (typeof data?.bin === 'string' && data.bin) {
-        setKey(data.bin);
+      if (typeof data?.bin === 'string') {
+        setKey((key) => {
+          if (typeof data?.bin !== 'string') return key;
+          if (key !== data.bin) setSync(false);
+          return data.bin;
+        });
         setShared(true);
-        setSync(false);
       }
       if (data?.$$) {
         setWasm(true);
@@ -372,7 +381,7 @@ const App = () => {
                 }}
               />
               <label htmlFor="chacha" style={style}>
-                ChaCha20-Poly1305
+                {'ChaCha20-Poly1305' as Suite}
               </label>
             </section>
             <section
@@ -390,7 +399,7 @@ const App = () => {
                 }}
               />
               <label htmlFor="aes" style={style}>
-                AES-256-GCM
+                {'AES-256-GCM' as Suite}
               </label>
             </section>
           </>
