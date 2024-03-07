@@ -1,18 +1,16 @@
-package main
+package pont
 
 import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
-	"crypto/sha512"
+	"crypto/sha256"
 	"encoding/base64"
 	"errors"
 	"fmt"
 	"io"
 	"strings"
-	"syscall/js"
 
-	"github.com/jamesliu96/ego"
 	"golang.org/x/crypto/chacha20poly1305"
 	"golang.org/x/crypto/hkdf"
 )
@@ -20,29 +18,31 @@ import (
 type Suite string
 
 const (
-	AES_256_GCM       Suite = "AES-256-GCM"
 	ChaCha20_Poly1305 Suite = "ChaCha20-Poly1305"
+	AES_256_GCM       Suite = "AES-256-GCM"
 )
 
-func deriveKey(key string, salt []byte) ([]byte, error) {
-	dk := make([]byte, 32)
-	if _, err := io.ReadFull(hkdf.New(sha512.New, []byte(key), salt, nil), dk); err != nil {
-		return nil, errors.ErrUnsupported
-	}
-	return dk, nil
+var seps = map[Suite]string{
+	ChaCha20_Poly1305: "$",
+	AES_256_GCM:       "#",
 }
 
-func encrypt(suite Suite, key, plaintext, aad string) (ciphertext string, err error) {
-	salt := make([]byte, 32)
-	if _, err = rand.Read(salt); err != nil {
-		return
-	}
-	var dk []byte
-	if dk, err = deriveKey(key, salt); err != nil {
-		return
-	}
+func Encrypt(suite Suite, key, plaintext, aad string) (ciphertext string, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("%+v", r)
+		}
+	}()
 	switch suite {
 	case AES_256_GCM:
+		salt := make([]byte, 32)
+		if _, err = rand.Read(salt); err != nil {
+			return
+		}
+		dk := make([]byte, 32)
+		if _, err = io.ReadFull(hkdf.New(sha256.New, []byte(key), salt, nil), dk); err != nil {
+			return
+		}
 		var block cipher.Block
 		if block, err = aes.NewCipher(dk); err != nil {
 			return
@@ -55,13 +55,22 @@ func encrypt(suite Suite, key, plaintext, aad string) (ciphertext string, err er
 		if _, err = rand.Read(nonce); err != nil {
 			return
 		}
+		sep := seps[suite]
 		text := aead.Seal(nil, nonce, []byte(plaintext), []byte(aad))
 		if len(aad) > 0 {
-			ciphertext = fmt.Sprintf("%s|%s|%s|%s", base64.StdEncoding.EncodeToString(salt), base64.StdEncoding.EncodeToString(nonce), base64.StdEncoding.EncodeToString(text), aad)
+			ciphertext = fmt.Sprintf("%s%s%s%s%s%s%s", base64.StdEncoding.EncodeToString(salt), sep, base64.StdEncoding.EncodeToString(nonce), sep, base64.StdEncoding.EncodeToString(text), sep, aad)
 		} else {
-			ciphertext = fmt.Sprintf("%s|%s|%s", base64.StdEncoding.EncodeToString(salt), base64.StdEncoding.EncodeToString(nonce), base64.StdEncoding.EncodeToString(text))
+			ciphertext = fmt.Sprintf("%s%s%s%s%s", base64.StdEncoding.EncodeToString(salt), sep, base64.StdEncoding.EncodeToString(nonce), sep, base64.StdEncoding.EncodeToString(text))
 		}
 	case ChaCha20_Poly1305:
+		salt := make([]byte, 32)
+		if _, err = rand.Read(salt); err != nil {
+			return
+		}
+		dk := make([]byte, chacha20poly1305.KeySize)
+		if _, err = io.ReadFull(hkdf.New(sha256.New, []byte(key), salt, nil), dk); err != nil {
+			return
+		}
 		var aead cipher.AEAD
 		if aead, err = chacha20poly1305.New(dk); err != nil {
 			return
@@ -70,11 +79,12 @@ func encrypt(suite Suite, key, plaintext, aad string) (ciphertext string, err er
 		if _, err = rand.Read(nonce); err != nil {
 			return
 		}
+		sep := seps[suite]
 		text := aead.Seal(nil, nonce, []byte(plaintext), []byte(aad))
 		if len(aad) > 0 {
-			ciphertext = fmt.Sprintf("%s$%s$%s$%s", base64.StdEncoding.EncodeToString(salt), base64.StdEncoding.EncodeToString(nonce), base64.StdEncoding.EncodeToString(text), aad)
+			ciphertext = fmt.Sprintf("%s%s%s%s%s%s%s", base64.StdEncoding.EncodeToString(salt), sep, base64.StdEncoding.EncodeToString(nonce), sep, base64.StdEncoding.EncodeToString(text), sep, aad)
 		} else {
-			ciphertext = fmt.Sprintf("%s$%s$%s", base64.StdEncoding.EncodeToString(salt), base64.StdEncoding.EncodeToString(nonce), base64.StdEncoding.EncodeToString(text))
+			ciphertext = fmt.Sprintf("%s%s%s%s%s", base64.StdEncoding.EncodeToString(salt), sep, base64.StdEncoding.EncodeToString(nonce), sep, base64.StdEncoding.EncodeToString(text))
 		}
 	default:
 		err = errors.ErrUnsupported
@@ -82,10 +92,16 @@ func encrypt(suite Suite, key, plaintext, aad string) (ciphertext string, err er
 	return
 }
 
-func decrypt(key, ciphertext string) (suite Suite, plaintext, aad string, err error) {
+func Decrypt(key, ciphertext string) (suite Suite, plaintext, aad string, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("%+v", r)
+		}
+	}()
 	err = errors.ErrUnsupported
-	if v := strings.Split(ciphertext, "|"); len(v) >= 3 {
+	if v := strings.Split(ciphertext, seps[AES_256_GCM]); len(v) >= 3 {
 		suite = AES_256_GCM
+		sep := seps[AES_256_GCM]
 		var salt []byte
 		if salt, err = base64.StdEncoding.DecodeString(v[0]); err != nil {
 			return
@@ -94,16 +110,16 @@ func decrypt(key, ciphertext string) (suite Suite, plaintext, aad string, err er
 		if nonce, err = base64.StdEncoding.DecodeString(v[1]); err != nil {
 			return
 		}
-		var dk []byte
-		if dk, err = deriveKey(key, salt); err != nil {
-			return
-		}
 		var text []byte
 		if text, err = base64.StdEncoding.DecodeString(v[2]); err != nil {
 			return
 		}
 		if len(v) > 3 {
-			aad = strings.Join(v[3:], "|")
+			aad = strings.Join(v[3:], sep)
+		}
+		dk := make([]byte, 32)
+		if _, err = io.ReadFull(hkdf.New(sha256.New, []byte(key), salt, nil), dk); err != nil {
+			return
 		}
 		var block cipher.Block
 		if block, err = aes.NewCipher(dk); err != nil {
@@ -117,9 +133,9 @@ func decrypt(key, ciphertext string) (suite Suite, plaintext, aad string, err er
 			return
 		}
 		plaintext = string(text)
-	}
-	if v := strings.Split(ciphertext, "$"); len(v) >= 3 {
+	} else if v := strings.Split(ciphertext, seps[ChaCha20_Poly1305]); len(v) >= 3 {
 		suite = ChaCha20_Poly1305
+		sep := seps[ChaCha20_Poly1305]
 		var salt []byte
 		if salt, err = base64.StdEncoding.DecodeString(v[0]); err != nil {
 			return
@@ -128,16 +144,16 @@ func decrypt(key, ciphertext string) (suite Suite, plaintext, aad string, err er
 		if nonce, err = base64.StdEncoding.DecodeString(v[1]); err != nil {
 			return
 		}
-		var dk []byte
-		if dk, err = deriveKey(key, salt); err != nil {
-			return
-		}
 		var text []byte
 		if text, err = base64.StdEncoding.DecodeString(v[2]); err != nil {
 			return
 		}
 		if len(v) > 3 {
-			aad = strings.Join(v[3:], "$")
+			aad = strings.Join(v[3:], sep)
+		}
+		dk := make([]byte, chacha20poly1305.KeySize)
+		if _, err = io.ReadFull(hkdf.New(sha256.New, []byte(key), salt, nil), dk); err != nil {
+			return
 		}
 		var aead cipher.AEAD
 		if aead, err = chacha20poly1305.New(dk); err != nil {
@@ -149,30 +165,4 @@ func decrypt(key, ciphertext string) (suite Suite, plaintext, aad string, err er
 		plaintext = string(text)
 	}
 	return
-}
-
-func main() {
-	// function pont$$encrypt(suite: 1 | 2, key: string, plaintext: string, aad: string): Promise<string>
-	js.Global().Set("pont$$encrypt", ego.PromiseOf(func(this js.Value, args []js.Value) any {
-		suite, key, plaintext, aad := args[0].String(), args[1].String(), args[2].String(), args[3].String()
-		ciphertext, err := encrypt(Suite(suite), key, plaintext, aad)
-		if err != nil {
-			panic(err)
-		}
-		return ciphertext
-	}))
-
-	// function pont$$decrypt(key: string, ciphertext: string): Promise<{ suite: 0 | 1; plaintext: string; aad: string }>
-	js.Global().Set("pont$$decrypt", ego.PromiseOf(func(this js.Value, args []js.Value) any {
-		key, ciphertext := args[0].String(), args[1].String()
-		suite, plaintext, aad, err := decrypt(key, ciphertext)
-		if err != nil {
-			panic(err)
-		}
-		return map[string]any{"suite": string(suite), "plaintext": plaintext, "aad": aad}
-	}))
-
-	js.Global().Call("postMessage", map[string]any{"$$": true})
-
-	ego.KeepAlive()
 }

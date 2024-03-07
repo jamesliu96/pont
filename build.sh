@@ -1,7 +1,7 @@
 #!/bin/bash
 
-pkg=github.com/jamesliu96/pont
-app=pont
+pkg=github.com/jamesliu96/pont/cmd/pts
+app=pts
 tag=$(git describe --tags --always)
 rev=$(git rev-list -1 HEAD)
 ldflags="-X main.app=$app -X main.gitTag=$tag -X main.gitRev=$rev"

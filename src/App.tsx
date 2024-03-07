@@ -10,10 +10,10 @@ import './App.css';
 
 import './wasm_exec.js';
 
-const [encodeRaw] = [
-  (str: string) => Uint8Array.from(str, (v) => v.charCodeAt(0)),
-  (bin: Uint8Array) => String.fromCharCode(...bin),
-];
+// const [encodeRaw, decodeRaw] = [
+//   (str: string) => Uint8Array.from(str, (v) => v.charCodeAt(0)),
+//   (bin: Uint8Array) => String.fromCharCode(...bin),
+// ];
 
 const [TE, TD] = [new TextEncoder(), new TextDecoder()];
 const [encodeText, decodeText] = [
@@ -40,23 +40,27 @@ const [copy, paste] = [
   },
 ];
 
-const SPLITTER = '|';
-
-const [wrapCipher, unwrapCipher] = [
+const [wrapCipher, unwrapCipher, splitCipher] = [
   (
     salt: Uint8Array,
     nonce: Uint8Array,
     text: Uint8Array,
-    aad: string | undefined
+    aad: string | undefined,
+    splitter = '|'
   ) =>
     [
       encodeBase64(salt),
       encodeBase64(nonce),
       encodeBase64(text),
       ...(aad ? [aad] : []),
-    ].join(SPLITTER),
-  (text: string) => {
-    const [_salt, _nonce = '', _cipher = '', ...aad] = text.split(SPLITTER);
+    ].join(splitter),
+  (text: string, splitter = '|') => {
+    const {
+      salt: _salt,
+      nonce: _nonce,
+      cipher: _cipher,
+      aad,
+    } = splitCipher(text, splitter);
     const salt = decodeBase64(_salt);
     const nonce = decodeBase64(_nonce);
     const cipher = decodeBase64(_cipher);
@@ -64,7 +68,16 @@ const [wrapCipher, unwrapCipher] = [
       salt,
       nonce,
       cipher,
-      aad: aad.length ? aad.join(SPLITTER) : undefined,
+      aad,
+    };
+  },
+  (text: string, splitter = '|') => {
+    const [salt, nonce = '', cipher = '', ...aad] = text.split(splitter);
+    return {
+      salt,
+      nonce,
+      cipher,
+      aad: aad.length ? aad.join(splitter) : undefined,
     };
   },
 ];
@@ -75,8 +88,6 @@ const SALT_LENGTH = 32;
 const NONCE_LENGTH = 16;
 const PBKDF2 = 'PBKDF2';
 const PBKDF2_ITERATIONS = 1e6;
-const HKDF = 'HKDF';
-const HKDF_INFO = new Uint8Array();
 const HASH = 'SHA-512';
 
 const App = () => {
@@ -97,57 +108,52 @@ const App = () => {
 
   const [chacha, setChacha] = useState(true);
 
-  const wasmed = useMemo(() => wasm && shared, [shared, wasm]);
-
-  const KDF = useMemo(() => (shared ? HKDF : PBKDF2), [shared]);
-
   const encrypt = useCallback(async () => {
     setWait(true);
     try {
       const salt = crypto.getRandomValues(new Uint8Array(SALT_LENGTH));
       const nonce = crypto.getRandomValues(new Uint8Array(NONCE_LENGTH));
-      const text = wasmed
-        ? await pont$$encrypt(
-            chacha ? 'ChaCha20-Poly1305' : 'AES-256-GCM',
-            key,
-            plaintext,
-            aad
-          )
-        : wrapCipher(
-            salt,
-            nonce,
-            new Uint8Array(
-              await crypto.subtle.encrypt(
-                {
-                  name: AES_GCM,
-                  iv: nonce,
-                  ...(aad ? { additionalData: encodeText(aad) } : undefined),
-                },
-                await crypto.subtle.deriveKey(
-                  KDF === HKDF
-                    ? { name: HKDF, hash: HASH, info: HKDF_INFO, salt }
-                    : {
-                        name: PBKDF2,
-                        hash: HASH,
-                        iterations: PBKDF2_ITERATIONS,
-                        salt,
-                      },
-                  await crypto.subtle.importKey(
-                    'raw',
-                    KDF === HKDF ? encodeRaw(key) : encodeText(key),
-                    KDF,
+      const text =
+        wasm && shared
+          ? await pont$$encrypt(
+              chacha ? 'ChaCha20-Poly1305' : 'AES-256-GCM',
+              key,
+              plaintext,
+              aad
+            )
+          : wrapCipher(
+              salt,
+              nonce,
+              new Uint8Array(
+                await crypto.subtle.encrypt(
+                  {
+                    name: AES_GCM,
+                    iv: nonce,
+                    ...(aad ? { additionalData: encodeText(aad) } : undefined),
+                  },
+                  await crypto.subtle.deriveKey(
+                    {
+                      name: PBKDF2,
+                      hash: HASH,
+                      iterations: PBKDF2_ITERATIONS,
+                      salt,
+                    },
+                    await crypto.subtle.importKey(
+                      'raw',
+                      encodeText(key),
+                      PBKDF2,
+                      false,
+                      ['deriveKey']
+                    ),
+                    { name: AES_GCM, length: AES_GCM_KEY_LENGTH * 8 },
                     false,
-                    ['deriveKey']
+                    ['encrypt']
                   ),
-                  { name: AES_GCM, length: AES_GCM_KEY_LENGTH * 8 },
-                  false,
-                  ['encrypt']
-                ),
-                encodeText(plaintext)
-              )
-            ),
-            aad
-          );
+                  encodeText(plaintext)
+                )
+              ),
+              aad
+            );
       setCiphertext(text);
       setSync(true);
       await copy(text);
@@ -157,12 +163,12 @@ const App = () => {
     } finally {
       setWait(false);
     }
-  }, [wasmed, chacha, key, plaintext, aad, KDF]);
+  }, [wasm, shared, chacha, key, plaintext, aad]);
 
   const decrypt = useCallback(async () => {
     setWait(true);
     try {
-      if (wasmed) {
+      if (wasm && shared) {
         const { suite, plaintext, aad } = await pont$$decrypt(key, ciphertext);
         setChacha(suite === 'ChaCha20-Poly1305');
         setPlaintext(plaintext);
@@ -178,18 +184,16 @@ const App = () => {
                 ...(aad ? { additionalData: encodeText(aad) } : undefined),
               },
               await crypto.subtle.deriveKey(
-                KDF === HKDF
-                  ? { name: HKDF, hash: HASH, info: HKDF_INFO, salt }
-                  : {
-                      name: PBKDF2,
-                      hash: HASH,
-                      iterations: PBKDF2_ITERATIONS,
-                      salt,
-                    },
+                {
+                  name: PBKDF2,
+                  hash: HASH,
+                  iterations: PBKDF2_ITERATIONS,
+                  salt,
+                },
                 await crypto.subtle.importKey(
                   'raw',
-                  KDF === HKDF ? encodeRaw(key) : encodeText(key),
-                  KDF,
+                  encodeText(key),
+                  PBKDF2,
                   false,
                   ['deriveKey']
                 ),
@@ -210,14 +214,27 @@ const App = () => {
     } finally {
       setWait(false);
     }
-  }, [wasmed, key, ciphertext, KDF]);
+  }, [wasm, shared, key, ciphertext]);
 
   const handleFocus = useCallback(async () => {
     try {
       const text = await paste();
       if (text) {
-        const { salt, nonce, cipher } = unwrapCipher(text);
-        if (salt.length && nonce.length && cipher.length) setCiphertext(text);
+        let { salt, nonce, cipher } = splitCipher(text);
+        if (salt.length && nonce.length && cipher.length) {
+          setCiphertext(text);
+          return;
+        }
+        ({ salt, nonce, cipher } = splitCipher(text, '#'));
+        if (salt.length && nonce.length && cipher.length) {
+          setCiphertext(text);
+          return;
+        }
+        ({ salt, nonce, cipher } = splitCipher(text, '$'));
+        if (salt.length && nonce.length && cipher.length) {
+          setCiphertext(text);
+          return;
+        }
       }
     } catch {}
   }, []);
@@ -245,20 +262,27 @@ const App = () => {
   useEffect(() => {
     (async () => {
       const go = new Go();
-      const { instance } = await WebAssembly.instantiateStreaming(
-        Promise.race([
-          fetch('pont.wasm'),
-          fetch(
-            'https://cdn.jsdelivr.net/gh/jamesliu96/pont@gh-pages/pont.wasm'
-          ).catch(() => new Promise<Response>(() => {})),
-        ]),
+      const source = await WebAssembly.instantiateStreaming(
+        process.env.NODE_ENV === 'development'
+          ? fetch('pts.wasm')
+          : Promise.race([
+              fetch('pts.wasm'),
+              fetch(
+                'https://cdn.jsdelivr.net/gh/jamesliu96/pont@gh-pages/pts.wasm'
+              ).catch(() => new Promise<Response>(() => {})),
+            ]),
         go.importObject
       );
-      await go.run(instance);
+      const { module } = source;
+      for (;;) {
+        let { instance } = source;
+        await go.run(instance);
+        instance = await WebAssembly.instantiate(module, go.importObject);
+      }
     })();
     const handleMessage = ({
       data,
-    }: MessageEvent<{ bin?: unknown; $$?: unknown } | undefined>) => {
+    }: MessageEvent<{ bin: unknown; $$: unknown } | undefined>) => {
       if (typeof data?.bin === 'string' && data.bin) {
         setKey(data.bin);
         setShared(true);
@@ -331,7 +355,7 @@ const App = () => {
             }}
           />
         </section>
-        {wasmed ? (
+        {wasm && shared ? (
           <>
             <section
               style={{ textWrap: 'nowrap', fontSize: 'x-small', width: 'auto' }}
@@ -339,6 +363,7 @@ const App = () => {
               <input
                 type="radio"
                 id="chacha"
+                disabled={wait}
                 checked={chacha}
                 style={{ margin: 0 }}
                 onChange={() => {
@@ -356,6 +381,7 @@ const App = () => {
               <input
                 type="radio"
                 id="aes"
+                disabled={wait}
                 checked={!chacha}
                 style={{ margin: 0 }}
                 onChange={() => {
@@ -370,7 +396,11 @@ const App = () => {
           </>
         ) : null}
         <section>
-          <button disabled={wait} style={style} onClick={encrypt}>
+          <button
+            disabled={wait || (!wasm && shared) || !key}
+            style={style}
+            onClick={encrypt}
+          >
             Encrypt
           </button>
           <div
@@ -384,7 +414,11 @@ const App = () => {
           >
             {icon}
           </div>
-          <button disabled={wait} style={style} onClick={decrypt}>
+          <button
+            disabled={wait || (!wasm && shared) || !key}
+            style={style}
+            onClick={decrypt}
+          >
             Decrypt
           </button>
         </section>
@@ -415,7 +449,7 @@ const App = () => {
             geheim
           </a>
         </div>
-        {wasmed ? (
+        {wasm && shared ? (
           <>
             <div>+</div>
             <div>
