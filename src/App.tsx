@@ -367,7 +367,7 @@ const App = () => {
         {wasm && shared ? (
           <>
             <section
-              style={{ textWrap: 'nowrap', fontSize: 'x-small', width: 'auto' }}
+              style={{ whiteSpace: 'nowrap', fontSize: 'x-small', width: 'auto' }}
             >
               <input
                 type="radio"
@@ -385,7 +385,7 @@ const App = () => {
               </label>
             </section>
             <section
-              style={{ textWrap: 'nowrap', fontSize: 'x-small', width: 'auto' }}
+              style={{ whiteSpace: 'nowrap', fontSize: 'x-small', width: 'auto' }}
             >
               <input
                 type="radio"
