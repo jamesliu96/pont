@@ -1,5 +1,5 @@
-github.com/jamesliu96/ego v1.1.0 h1:6VGYJo2mJlOZEdxSWTVHT71QVu5/CKr8qVtWvjPvQZU=
-github.com/jamesliu96/ego v1.1.0/go.mod h1:hLZ65h9W9/zQOAGp/L9otdvgsm2rbgxiMHxU2QtckjM=
+github.com/jamesliu96/ego v1.3.0 h1:/zTyoBLH9YDGFaEUKz8dnX78zNpXtU00CeELT7S07KQ=
+github.com/jamesliu96/ego v1.3.0/go.mod h1:hLZ65h9W9/zQOAGp/L9otdvgsm2rbgxiMHxU2QtckjM=
 golang.org/x/crypto v0.21.0 h1:X31++rzVUdKhX5sWmSOFZxx8UW/ldWx55cbf08iNAMA=
 golang.org/x/crypto v0.21.0/go.mod h1:0BP7YvVV9gBbVKyeTG0Gyn+gZm94bibOW5BjDEYAOMs=
 golang.org/x/sys v0.18.0 h1:DBdB3niSjOA/O0blCZBqDefyWNYveAYMNF1Wum0DYQ4=
