@@ -22,7 +22,7 @@ const [encodeText, decodeText] = [
 ];
 
 const [encodeBase64, decodeBase64] = [
-  (bin: Uint8Array) => btoa(String.fromCodePoint(...bin)),
+  (bin: Uint8Array) => btoa(String.fromCodePoint(...bin)).replace(/=+$/g, ''),
   (str: string) =>
     Uint8Array.from(atob(str), (v) => v.codePointAt(0) as number),
 ];
@@ -367,7 +367,11 @@ const App = () => {
         {wasm && shared ? (
           <>
             <section
-              style={{ whiteSpace: 'nowrap', fontSize: 'x-small', width: 'auto' }}
+              style={{
+                whiteSpace: 'nowrap',
+                fontSize: 'x-small',
+                width: 'auto',
+              }}
             >
               <input
                 type="radio"
@@ -385,7 +389,11 @@ const App = () => {
               </label>
             </section>
             <section
-              style={{ whiteSpace: 'nowrap', fontSize: 'x-small', width: 'auto' }}
+              style={{
+                whiteSpace: 'nowrap',
+                fontSize: 'x-small',
+                width: 'auto',
+              }}
             >
               <input
                 type="radio"

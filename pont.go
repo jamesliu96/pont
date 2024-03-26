@@ -27,6 +27,8 @@ var seps = map[Suite]string{
 	AES_256_GCM:       "#",
 }
 
+var encoding = base64.RawStdEncoding
+
 func Encrypt(suite Suite, key, plaintext, aad string) (ciphertext string, err error) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -58,9 +60,9 @@ func Encrypt(suite Suite, key, plaintext, aad string) (ciphertext string, err er
 		sep := seps[suite]
 		text := aead.Seal(nil, nonce, []byte(plaintext), []byte(aad))
 		if len(aad) > 0 {
-			ciphertext = fmt.Sprintf("%s%s%s%s%s%s%s", base64.StdEncoding.EncodeToString(salt), sep, base64.StdEncoding.EncodeToString(nonce), sep, base64.StdEncoding.EncodeToString(text), sep, aad)
+			ciphertext = fmt.Sprintf("%s%s%s%s%s%s%s", encoding.EncodeToString(salt), sep, encoding.EncodeToString(nonce), sep, encoding.EncodeToString(text), sep, aad)
 		} else {
-			ciphertext = fmt.Sprintf("%s%s%s%s%s", base64.StdEncoding.EncodeToString(salt), sep, base64.StdEncoding.EncodeToString(nonce), sep, base64.StdEncoding.EncodeToString(text))
+			ciphertext = fmt.Sprintf("%s%s%s%s%s", encoding.EncodeToString(salt), sep, encoding.EncodeToString(nonce), sep, encoding.EncodeToString(text))
 		}
 	case ChaCha20_Poly1305:
 		salt := make([]byte, 32)
@@ -82,9 +84,9 @@ func Encrypt(suite Suite, key, plaintext, aad string) (ciphertext string, err er
 		sep := seps[suite]
 		text := aead.Seal(nil, nonce, []byte(plaintext), []byte(aad))
 		if len(aad) > 0 {
-			ciphertext = fmt.Sprintf("%s%s%s%s%s%s%s", base64.StdEncoding.EncodeToString(salt), sep, base64.StdEncoding.EncodeToString(nonce), sep, base64.StdEncoding.EncodeToString(text), sep, aad)
+			ciphertext = fmt.Sprintf("%s%s%s%s%s%s%s", encoding.EncodeToString(salt), sep, encoding.EncodeToString(nonce), sep, encoding.EncodeToString(text), sep, aad)
 		} else {
-			ciphertext = fmt.Sprintf("%s%s%s%s%s", base64.StdEncoding.EncodeToString(salt), sep, base64.StdEncoding.EncodeToString(nonce), sep, base64.StdEncoding.EncodeToString(text))
+			ciphertext = fmt.Sprintf("%s%s%s%s%s", encoding.EncodeToString(salt), sep, encoding.EncodeToString(nonce), sep, encoding.EncodeToString(text))
 		}
 	default:
 		err = errors.ErrUnsupported
@@ -103,15 +105,15 @@ func Decrypt(key, ciphertext string) (suite Suite, plaintext, aad string, err er
 		suite = AES_256_GCM
 		sep := seps[AES_256_GCM]
 		var salt []byte
-		if salt, err = base64.StdEncoding.DecodeString(v[0]); err != nil {
+		if salt, err = encoding.DecodeString(v[0]); err != nil {
 			return
 		}
 		var nonce []byte
-		if nonce, err = base64.StdEncoding.DecodeString(v[1]); err != nil {
+		if nonce, err = encoding.DecodeString(v[1]); err != nil {
 			return
 		}
 		var text []byte
-		if text, err = base64.StdEncoding.DecodeString(v[2]); err != nil {
+		if text, err = encoding.DecodeString(v[2]); err != nil {
 			return
 		}
 		if len(v) > 3 {
@@ -137,15 +139,15 @@ func Decrypt(key, ciphertext string) (suite Suite, plaintext, aad string, err er
 		suite = ChaCha20_Poly1305
 		sep := seps[ChaCha20_Poly1305]
 		var salt []byte
-		if salt, err = base64.StdEncoding.DecodeString(v[0]); err != nil {
+		if salt, err = encoding.DecodeString(v[0]); err != nil {
 			return
 		}
 		var nonce []byte
-		if nonce, err = base64.StdEncoding.DecodeString(v[1]); err != nil {
+		if nonce, err = encoding.DecodeString(v[1]); err != nil {
 			return
 		}
 		var text []byte
-		if text, err = base64.StdEncoding.DecodeString(v[2]); err != nil {
+		if text, err = encoding.DecodeString(v[2]); err != nil {
 			return
 		}
 		if len(v) > 3 {
