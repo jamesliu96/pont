@@ -253,14 +253,7 @@ const App = () => {
   const style = useMemo(
     () =>
       ({
-        color:
-          sync && shared
-            ? 'teal'
-            : sync
-            ? 'green'
-            : shared
-            ? 'blue'
-            : undefined,
+        color: sync ? 'green' : shared ? 'blue' : undefined,
       } as CSSProperties),
     [shared, sync]
   );
@@ -321,7 +314,7 @@ const App = () => {
           <input
             disabled={wait}
             placeholder="key"
-            type={shared ? 'password' : focus ? 'text' : 'password'}
+            type={focus ? 'text' : 'password'}
             value={key}
             style={style}
             onChange={(e) => {
