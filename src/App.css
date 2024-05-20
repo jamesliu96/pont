@@ -50,6 +50,10 @@ footer {
     monospace;
 }
 
+input[type='radio']:checked + label {
+  font-weight: bold;
+}
+
 footer {
   text-align: center;
   color: gray;
