@@ -4,7 +4,7 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
-	"crypto/sha512"
+	"crypto/sha256"
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -42,7 +42,7 @@ func Encrypt(suite Suite, key, plaintext, aad string) (ciphertext string, err er
 			return
 		}
 		dk := make([]byte, 32)
-		if _, err = io.ReadFull(hkdf.New(sha512.New, []byte(key), salt, nil), dk); err != nil {
+		if _, err = io.ReadFull(hkdf.New(sha256.New, []byte(key), salt, nil), dk); err != nil {
 			return
 		}
 		var block cipher.Block
@@ -70,7 +70,7 @@ func Encrypt(suite Suite, key, plaintext, aad string) (ciphertext string, err er
 			return
 		}
 		dk := make([]byte, chacha20poly1305.KeySize)
-		if _, err = io.ReadFull(hkdf.New(sha512.New, []byte(key), salt, nil), dk); err != nil {
+		if _, err = io.ReadFull(hkdf.New(sha256.New, []byte(key), salt, nil), dk); err != nil {
 			return
 		}
 		var aead cipher.AEAD
@@ -120,7 +120,7 @@ func Decrypt(key, ciphertext string) (suite Suite, plaintext, aad string, err er
 			aad = strings.Join(v[3:], sep)
 		}
 		dk := make([]byte, 32)
-		if _, err = io.ReadFull(hkdf.New(sha512.New, []byte(key), salt, nil), dk); err != nil {
+		if _, err = io.ReadFull(hkdf.New(sha256.New, []byte(key), salt, nil), dk); err != nil {
 			return
 		}
 		var block cipher.Block
@@ -154,7 +154,7 @@ func Decrypt(key, ciphertext string) (suite Suite, plaintext, aad string, err er
 			aad = strings.Join(v[3:], sep)
 		}
 		dk := make([]byte, chacha20poly1305.KeySize)
-		if _, err = io.ReadFull(hkdf.New(sha512.New, []byte(key), salt, nil), dk); err != nil {
+		if _, err = io.ReadFull(hkdf.New(sha256.New, []byte(key), salt, nil), dk); err != nil {
 			return
 		}
 		var aead cipher.AEAD
