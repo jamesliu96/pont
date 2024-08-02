@@ -88,7 +88,7 @@ const SALT_LENGTH = 32;
 const NONCE_LENGTH = 16;
 const PBKDF2 = 'PBKDF2';
 const PBKDF2_ITERATIONS = 1e6;
-const HASH = 'SHA-512';
+const HASH = 'SHA-256';
 
 const App = () => {
   const [wait, setWait] = useState(false);
@@ -102,8 +102,8 @@ const App = () => {
   const [aad, setAAD] = useState('');
 
   const [shared, setShared] = useState(false);
-  const [wasm, setWasm] = useState(false);
-  const [chacha, setChacha] = useState(true);
+  const [modes, setModes] = useState<string[]>();
+  const [mode, setMode] = useState<string>();
 
   const encrypt = useCallback(async () => {
     setWait(true);
@@ -111,13 +111,8 @@ const App = () => {
       const salt = crypto.getRandomValues(new Uint8Array(SALT_LENGTH));
       const nonce = crypto.getRandomValues(new Uint8Array(NONCE_LENGTH));
       const text =
-        wasm && shared
-          ? await pont$$encrypt(
-              chacha ? 'ChaCha20-Poly1305' : 'AES-256-GCM',
-              key,
-              plaintext,
-              aad
-            )
+        modes?.length && shared
+          ? await pont$$encrypt(mode as Suite, key, plaintext, aad)
           : wrapCipher(
               salt,
               nonce,
@@ -160,14 +155,14 @@ const App = () => {
     } finally {
       setWait(false);
     }
-  }, [wasm, shared, chacha, key, plaintext, aad]);
+  }, [modes?.length, shared, mode, key, plaintext, aad]);
 
   const decrypt = useCallback(async () => {
     setWait(true);
     try {
-      if (wasm && shared) {
+      if (modes?.length && shared) {
         const { suite, plaintext, aad } = await pont$$decrypt(key, ciphertext);
-        setChacha(suite === 'ChaCha20-Poly1305');
+        setMode(suite);
         setPlaintext(plaintext);
         setAAD(aad);
       } else {
@@ -211,7 +206,7 @@ const App = () => {
     } finally {
       setWait(false);
     }
-  }, [wasm, shared, key, ciphertext]);
+  }, [modes?.length, shared, key, ciphertext]);
 
   const handleFocus = useCallback(async () => {
     try {
@@ -290,8 +285,9 @@ const App = () => {
         });
         setShared(true);
       }
-      if (data?.$$) {
-        setWasm(true);
+      if (Array.isArray(data?.$$) && data?.$$.length) {
+        setModes(data.$$);
+        setMode(data.$$[0]);
       }
     };
     window.addEventListener('message', handleMessage);
@@ -357,57 +353,36 @@ const App = () => {
             }}
           />
         </section>
-        {wasm && shared ? (
-          <>
-            <section
-              style={{
-                whiteSpace: 'nowrap',
-                fontSize: 'x-small',
-                width: 'auto',
-              }}
-            >
-              <input
-                type="radio"
-                id="chacha"
-                disabled={wait}
-                checked={chacha}
-                style={{ margin: 0 }}
-                onChange={() => {
-                  setChacha(true);
-                  setSync(false);
+        {modes?.length && shared
+          ? modes.map((m) => (
+              <section
+                key={m}
+                style={{
+                  whiteSpace: 'nowrap',
+                  fontSize: 'x-small',
+                  width: 'auto',
                 }}
-              />
-              <label htmlFor="chacha" style={style}>
-                {'ChaCha20-Poly1305' as Suite}
-              </label>
-            </section>
-            <section
-              style={{
-                whiteSpace: 'nowrap',
-                fontSize: 'x-small',
-                width: 'auto',
-              }}
-            >
-              <input
-                type="radio"
-                id="aes"
-                disabled={wait}
-                checked={!chacha}
-                style={{ margin: 0 }}
-                onChange={() => {
-                  setChacha(false);
-                  setSync(false);
-                }}
-              />
-              <label htmlFor="aes" style={style}>
-                {'AES-256-GCM' as Suite}
-              </label>
-            </section>
-          </>
-        ) : null}
+              >
+                <input
+                  type="radio"
+                  id={m}
+                  disabled={wait}
+                  checked={mode === m}
+                  style={{ margin: 0 }}
+                  onChange={() => {
+                    setMode(m);
+                    setSync(false);
+                  }}
+                />
+                <label htmlFor={m} style={style}>
+                  {m}
+                </label>
+              </section>
+            ))
+          : null}
         <section>
           <button
-            disabled={wait || (!wasm && shared) || !key}
+            disabled={wait || (!modes?.length && shared) || !key}
             style={style}
             onClick={encrypt}
           >
@@ -425,7 +400,7 @@ const App = () => {
             {icon}
           </div>
           <button
-            disabled={wait || (!wasm && shared) || !key}
+            disabled={wait || (!modes?.length && shared) || !key}
             style={style}
             onClick={decrypt}
           >
@@ -459,7 +434,7 @@ const App = () => {
             geheim
           </a>
         </div>
-        {wasm && shared ? (
+        {modes?.length && shared ? (
           <>
             <div>+</div>
             <div>

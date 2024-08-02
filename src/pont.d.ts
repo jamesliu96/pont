@@ -1,4 +1,4 @@
-type Suite = 'AES-256-GCM' | 'ChaCha20-Poly1305';
+type Suite = 'AES-256-GCM_SHA256' | 'ChaCha20-Poly1305_SHA256';
 
 declare function pont$$encrypt(
   suite: Suite,

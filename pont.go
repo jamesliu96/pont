@@ -18,13 +18,13 @@ import (
 type Suite string
 
 const (
-	ChaCha20_Poly1305 Suite = "ChaCha20-Poly1305"
-	AES_256_GCM       Suite = "AES-256-GCM"
+	ChaCha20_Poly1305_SHA256 Suite = "ChaCha20-Poly1305_SHA256"
+	AES_256_GCM_SHA256       Suite = "AES-256-GCM_SHA256"
 )
 
 var seps = map[Suite]string{
-	ChaCha20_Poly1305: "$",
-	AES_256_GCM:       "#",
+	ChaCha20_Poly1305_SHA256: "$",
+	AES_256_GCM_SHA256:       "#",
 }
 
 var encoding = base64.RawStdEncoding
@@ -36,7 +36,7 @@ func Encrypt(suite Suite, key, plaintext, aad string) (ciphertext string, err er
 		}
 	}()
 	switch suite {
-	case AES_256_GCM:
+	case AES_256_GCM_SHA256:
 		salt := make([]byte, 32)
 		if _, err = rand.Read(salt); err != nil {
 			return
@@ -64,7 +64,7 @@ func Encrypt(suite Suite, key, plaintext, aad string) (ciphertext string, err er
 		} else {
 			ciphertext = fmt.Sprintf("%s%s%s%s%s", encoding.EncodeToString(salt), sep, encoding.EncodeToString(nonce), sep, encoding.EncodeToString(text))
 		}
-	case ChaCha20_Poly1305:
+	case ChaCha20_Poly1305_SHA256:
 		salt := make([]byte, 32)
 		if _, err = rand.Read(salt); err != nil {
 			return
@@ -101,9 +101,9 @@ func Decrypt(key, ciphertext string) (suite Suite, plaintext, aad string, err er
 		}
 	}()
 	err = errors.ErrUnsupported
-	if v := strings.Split(ciphertext, seps[AES_256_GCM]); len(v) >= 3 {
-		suite = AES_256_GCM
-		sep := seps[AES_256_GCM]
+	if v := strings.Split(ciphertext, seps[AES_256_GCM_SHA256]); len(v) >= 3 {
+		suite = AES_256_GCM_SHA256
+		sep := seps[AES_256_GCM_SHA256]
 		var salt []byte
 		if salt, err = encoding.DecodeString(v[0]); err != nil {
 			return
@@ -135,9 +135,9 @@ func Decrypt(key, ciphertext string) (suite Suite, plaintext, aad string, err er
 			return
 		}
 		plaintext = string(text)
-	} else if v := strings.Split(ciphertext, seps[ChaCha20_Poly1305]); len(v) >= 3 {
-		suite = ChaCha20_Poly1305
-		sep := seps[ChaCha20_Poly1305]
+	} else if v := strings.Split(ciphertext, seps[ChaCha20_Poly1305_SHA256]); len(v) >= 3 {
+		suite = ChaCha20_Poly1305_SHA256
+		sep := seps[ChaCha20_Poly1305_SHA256]
 		var salt []byte
 		if salt, err = encoding.DecodeString(v[0]); err != nil {
 			return
