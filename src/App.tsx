@@ -236,6 +236,22 @@ const App = () => {
           });
           return;
         }
+        ({ salt, nonce, cipher } = splitCipher(text, ':'));
+        if (salt.length && nonce.length && cipher.length) {
+          setCiphertext((ciphertext) => {
+            if (ciphertext !== text) setSync(false);
+            return text;
+          });
+          return;
+        }
+        ({ salt, nonce, cipher } = splitCipher(text, '@'));
+        if (salt.length && nonce.length && cipher.length) {
+          setCiphertext((ciphertext) => {
+            if (ciphertext !== text) setSync(false);
+            return text;
+          });
+          return;
+        }
       }
     } catch {}
   }, []);
