@@ -5,6 +5,7 @@ import (
 	"crypto/cipher"
 	"crypto/rand"
 	"crypto/sha256"
+	"crypto/sha512"
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -21,25 +22,37 @@ type Suite string
 
 const (
 	ChaCha20_Poly1305_SHA256   Suite = "ChaCha20-Poly1305_SHA256"
+	ChaCha20_Poly1305_SHA512   Suite = "ChaCha20-Poly1305_SHA512"
 	ChaCha20_Poly1305_SHA3_256 Suite = "ChaCha20-Poly1305_SHA3-256"
+	ChaCha20_Poly1305_SHA3_512 Suite = "ChaCha20-Poly1305_SHA3-512"
 	AES_256_GCM_SHA256         Suite = "AES-256-GCM_SHA256"
+	AES_256_GCM_SHA512         Suite = "AES-256-GCM_SHA512"
 	AES_256_GCM_SHA3_256       Suite = "AES-256-GCM_SHA3-256"
+	AES_256_GCM_SHA3_512       Suite = "AES-256-GCM_SHA3-512"
 )
 
 const saltSize = 32
 
 var seps = map[Suite]string{
 	ChaCha20_Poly1305_SHA256:   "$",
+	ChaCha20_Poly1305_SHA512:   "%",
 	ChaCha20_Poly1305_SHA3_256: ":",
+	ChaCha20_Poly1305_SHA3_512: "*",
 	AES_256_GCM_SHA256:         "#",
+	AES_256_GCM_SHA512:         "!",
 	AES_256_GCM_SHA3_256:       "@",
+	AES_256_GCM_SHA3_512:       "^",
 }
 
 var keySizes = map[Suite]int{
 	ChaCha20_Poly1305_SHA256:   chacha20poly1305.KeySize,
+	ChaCha20_Poly1305_SHA512:   chacha20poly1305.KeySize,
 	ChaCha20_Poly1305_SHA3_256: chacha20poly1305.KeySize,
+	ChaCha20_Poly1305_SHA3_512: chacha20poly1305.KeySize,
 	AES_256_GCM_SHA256:         32,
+	AES_256_GCM_SHA512:         32,
 	AES_256_GCM_SHA3_256:       32,
+	AES_256_GCM_SHA3_512:       32,
 }
 
 var aes256 = func(dk []byte) (aead cipher.AEAD, err error) {
@@ -52,9 +65,13 @@ var aes256 = func(dk []byte) (aead cipher.AEAD, err error) {
 }
 var aeads = map[Suite]func([]byte) (cipher.AEAD, error){
 	ChaCha20_Poly1305_SHA256:   chacha20poly1305.New,
+	ChaCha20_Poly1305_SHA512:   chacha20poly1305.New,
 	ChaCha20_Poly1305_SHA3_256: chacha20poly1305.New,
+	ChaCha20_Poly1305_SHA3_512: chacha20poly1305.New,
 	AES_256_GCM_SHA256:         aes256,
+	AES_256_GCM_SHA512:         aes256,
 	AES_256_GCM_SHA3_256:       aes256,
+	AES_256_GCM_SHA3_512:       aes256,
 }
 
 var encoding = base64.RawStdEncoding
@@ -69,8 +86,12 @@ func Encrypt(suite Suite, key, plaintext, aad string) (ciphertext string, err er
 	switch suite {
 	case ChaCha20_Poly1305_SHA256, AES_256_GCM_SHA256:
 		ciphertext, err = encrypt(suite, key, plaintext, aad, sha256.New)
+	case ChaCha20_Poly1305_SHA512, AES_256_GCM_SHA512:
+		ciphertext, err = encrypt(suite, key, plaintext, aad, sha512.New)
 	case ChaCha20_Poly1305_SHA3_256, AES_256_GCM_SHA3_256:
 		ciphertext, err = encrypt(suite, key, plaintext, aad, sha3.New256)
+	case ChaCha20_Poly1305_SHA3_512, AES_256_GCM_SHA3_512:
+		ciphertext, err = encrypt(suite, key, plaintext, aad, sha3.New512)
 	}
 	return
 }
@@ -88,12 +109,24 @@ func Decrypt(key, ciphertext string) (suite Suite, plaintext, aad string, err er
 	} else if v := strings.Split(ciphertext, seps[AES_256_GCM_SHA256]); len(v) >= 3 {
 		suite = AES_256_GCM_SHA256
 		plaintext, aad, err = decrypt(suite, v, key, sha256.New)
+	} else if v := strings.Split(ciphertext, seps[ChaCha20_Poly1305_SHA512]); len(v) >= 3 {
+		suite = ChaCha20_Poly1305_SHA512
+		plaintext, aad, err = decrypt(suite, v, key, sha512.New)
+	} else if v := strings.Split(ciphertext, seps[AES_256_GCM_SHA512]); len(v) >= 3 {
+		suite = AES_256_GCM_SHA512
+		plaintext, aad, err = decrypt(suite, v, key, sha512.New)
 	} else if v := strings.Split(ciphertext, seps[ChaCha20_Poly1305_SHA3_256]); len(v) >= 3 {
 		suite = ChaCha20_Poly1305_SHA3_256
 		plaintext, aad, err = decrypt(suite, v, key, sha3.New256)
 	} else if v := strings.Split(ciphertext, seps[AES_256_GCM_SHA3_256]); len(v) >= 3 {
 		suite = AES_256_GCM_SHA3_256
 		plaintext, aad, err = decrypt(suite, v, key, sha3.New256)
+	} else if v := strings.Split(ciphertext, seps[ChaCha20_Poly1305_SHA3_512]); len(v) >= 3 {
+		suite = ChaCha20_Poly1305_SHA3_512
+		plaintext, aad, err = decrypt(suite, v, key, sha3.New512)
+	} else if v := strings.Split(ciphertext, seps[AES_256_GCM_SHA3_512]); len(v) >= 3 {
+		suite = AES_256_GCM_SHA3_512
+		plaintext, aad, err = decrypt(suite, v, key, sha3.New512)
 	}
 	return
 }
