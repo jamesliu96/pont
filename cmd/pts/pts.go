@@ -28,7 +28,7 @@ func main() {
 		return map[string]any{"suite": string(suite), "plaintext": plaintext, "aad": aad}
 	}))
 
-	js.Global().Call("postMessage", map[string]any{"$$": []any{string(pont.ChaCha20_Poly1305_SHA3_256), string(pont.ChaCha20_Poly1305_SHA256), string(pont.AES_256_GCM_SHA3_256), string(pont.AES_256_GCM_SHA256)}})
+	js.Global().Call("postMessage", map[string]any{"$$": []any{string(pont.ChaCha20_Poly1305_SHA256), string(pont.ChaCha20_Poly1305_SHA3_256), string(pont.AES_256_GCM_SHA256), string(pont.AES_256_GCM_SHA3_256)}})
 
 	ego.KeepAlive()
 }
