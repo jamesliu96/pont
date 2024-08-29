@@ -369,33 +369,25 @@ const App = () => {
             }}
           />
         </section>
-        {modes?.length && shared
-          ? modes.map((m) => (
-              <section
-                key={m}
-                style={{
-                  whiteSpace: 'nowrap',
-                  fontSize: 'x-small',
-                  width: 'auto',
-                }}
-              >
-                <input
-                  type="radio"
-                  id={m}
-                  disabled={wait}
-                  checked={mode === m}
-                  style={{ margin: 0 }}
-                  onChange={() => {
-                    setMode(m);
-                    setSync(false);
-                  }}
-                />
-                <label htmlFor={m} style={style}>
+        <section>
+          {modes?.length && shared ? (
+            <select
+              disabled={wait}
+              value={mode}
+              style={{ ...style, width: '100%', fontSize: 'small' }}
+              onChange={(e) => {
+                setMode(e.target.value);
+                setSync(false);
+              }}
+            >
+              {modes.map((m) => (
+                <option key={m} value={m}>
                   {m}
-                </label>
-              </section>
-            ))
-          : null}
+                </option>
+              ))}
+            </select>
+          ) : null}
+        </section>
         <section>
           <button
             disabled={wait || (!modes?.length && shared) || !key}
@@ -452,7 +444,7 @@ const App = () => {
         </div>
         {modes?.length && shared ? (
           <>
-            <div>+</div>
+            <div style={{ lineHeight: 1 }}>+</div>
             <div>
               <a
                 href="https://github.com/jamesliu96/ego"
