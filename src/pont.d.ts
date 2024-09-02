@@ -1,7 +1,5 @@
-type Suite = 'AES-256-GCM_SHA256' | 'ChaCha20-Poly1305_SHA256';
-
 declare function pont$$encrypt(
-  suite: Suite,
+  suite: string,
   key: string,
   plaintext: string,
   aad: string
@@ -10,4 +8,4 @@ declare function pont$$encrypt(
 declare function pont$$decrypt(
   key: string,
   ciphertext: string
-): Promise<{ suite: Suite; plaintext: string; aad: string }>;
+): Promise<{ suite: string; plaintext: string; aad: string }>;

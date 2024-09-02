@@ -111,8 +111,8 @@ const App = () => {
       const salt = crypto.getRandomValues(new Uint8Array(SALT_LENGTH));
       const nonce = crypto.getRandomValues(new Uint8Array(NONCE_LENGTH));
       const text =
-        modes?.length && shared
-          ? await pont$$encrypt(mode as Suite, key, plaintext, aad)
+        mode && shared
+          ? await pont$$encrypt(mode, key, plaintext, aad)
           : wrapCipher(
               salt,
               nonce,
@@ -155,12 +155,12 @@ const App = () => {
     } finally {
       setWait(false);
     }
-  }, [modes?.length, shared, mode, key, plaintext, aad]);
+  }, [shared, mode, key, plaintext, aad]);
 
   const decrypt = useCallback(async () => {
     setWait(true);
     try {
-      if (modes?.length && shared) {
+      if (mode && shared) {
         const { suite, plaintext, aad } = await pont$$decrypt(key, ciphertext);
         setMode(suite);
         setPlaintext(plaintext);
@@ -206,7 +206,7 @@ const App = () => {
     } finally {
       setWait(false);
     }
-  }, [modes?.length, shared, key, ciphertext]);
+  }, [mode, shared, key, ciphertext]);
 
   const handleFocus = useCallback(async () => {
     try {
