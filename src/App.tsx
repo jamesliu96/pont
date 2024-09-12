@@ -369,8 +369,8 @@ const App = () => {
             }}
           />
         </section>
-        <section>
-          {modes?.length && shared ? (
+        {modes?.length && shared ? (
+          <section>
             <select
               disabled={wait}
               value={mode}
@@ -386,8 +386,8 @@ const App = () => {
                 </option>
               ))}
             </select>
-          ) : null}
-        </section>
+          </section>
+        ) : null}
         <section>
           <button
             disabled={wait || (!modes?.length && shared) || !key}
@@ -478,7 +478,7 @@ const App = () => {
             target="_blank"
             rel="noreferrer"
           >
-            🌁
+            🌉
           </a>
         </div>
       </footer>
